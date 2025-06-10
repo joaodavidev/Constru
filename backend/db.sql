@@ -12,13 +12,15 @@ CREATE TABLE usuarios (
 CREATE TABLE enderecos (
   id SERIAL PRIMARY KEY,
   usuario_id INT REFERENCES usuarios(id) ON DELETE CASCADE,
+  nome_endereco VARCHAR(50) NOT NULL,
   rua VARCHAR(100),
   numero VARCHAR(10),
   complemento VARCHAR(50),
   bairro VARCHAR(50),
   cidade VARCHAR(50),
   estado CHAR(2),
-  cep CHAR(9)
+  cep CHAR(9),
+  UNIQUE (usuario_id, nome_endereco)
 );
 
 CREATE TABLE categorias (
@@ -36,10 +38,11 @@ CREATE TABLE produtos (
 
 CREATE TABLE ofertas (
   id SERIAL PRIMARY KEY,
-  produto_id INT REFERENCES produtos(id) ON DELETE CASCADE,
-  fornecedor_id INT REFERENCES usuarios(id) ON DELETE CASCADE,
-  preco DECIMAL(10, 2) NOT NULL,
-  estoque INT DEFAULT 0,
+  produto_id INT NOT NULL REFERENCES produtos(id) ON DELETE CASCADE,
+  fornecedor_id INT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  preco DECIMAL(10, 2) NOT NULL CHECK (preco > 0),
+  estoque INT NOT NULL CHECK (estoque >= 0),
+  endereco_id INT NOT NULL REFERENCES enderecos(id),
   UNIQUE (produto_id, fornecedor_id)
 );
 

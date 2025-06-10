@@ -10,8 +10,10 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import SupplierSignupPage from './pages/SupplierSignupPage';
 import CategoriesPage from './pages/CategoriesPage';
+import SupplierAnnouncementPage from './pages/SupplierAnnouncementPage';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
+import ProtectedSupplierRoute from './components/ProtectedSupplierRoute';
 
 function App() {
   return (
@@ -30,6 +32,11 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/supplier/signup" element={<SupplierSignupPage />} />
+                <Route path="/supplier/dashboard" element={
+                  <ProtectedSupplierRoute>
+                    <SupplierAnnouncementPage />
+                  </ProtectedSupplierRoute>
+                } />
               </Routes>
             </main>
             <Footer />

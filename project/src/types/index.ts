@@ -20,6 +20,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  tipo_usuario?: string;
+  cnpj?: string;
 }
 
 export interface Category {
