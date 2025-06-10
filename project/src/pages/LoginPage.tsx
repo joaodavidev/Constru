@@ -26,9 +26,9 @@ export default function LoginPage() {
       setError('');
       setLoading(true);
       await login(email, password);
-      navigate(`/${redirectUrl}`);
-    } catch (err) {
-      setError('Falha ao entrar. Por favor, verifique suas credenciais.');
+      navigate(redirectUrl);
+    } catch (err: any) {
+      setError(err.message || 'Falha ao entrar. Por favor, verifique suas credenciais.');
       console.error(err);
     } finally {
       setLoading(false);

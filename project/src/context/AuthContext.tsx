@@ -5,7 +5,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, tipo_usuario?: string, cnpj?: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -32,19 +32,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    // In a real app, this would call an API endpoint
-    // For demo purposes, we're just using the mock user
-    setUser(mockUser);
+    // Chama a API de login do backend
+    const response = await fetch('http://localhost:3001/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, senha: password })
+    });
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Erro ao fazer login');
+    }
+    const data = await response.json();
+    setUser(data.user);
     setIsAuthenticated(true);
-    localStorage.setItem('user', JSON.stringify(mockUser));
+    localStorage.setItem('user', JSON.stringify(data.user));
   };
 
-  const signup = async (name: string, email: string, password: string) => {
-    // In a real app, this would call an API endpoint
-    const newUser = { ...mockUser, name, email };
-    setUser(newUser);
+  const signup = async (name: string, email: string, password: string, tipo_usuario: string = 'cliente', cnpj?: string) => {
+    // Chama a API de cadastro do backend
+    const response = await fetch('http://localhost:3001/usuarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome: name, email, senha: password, tipo_usuario, cnpj })
+    });
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Erro ao criar conta');
+    }
+    const data = await response.json();
+    setUser(data.user);
     setIsAuthenticated(true);
-    localStorage.setItem('user', JSON.stringify(newUser));
+    localStorage.setItem('user', JSON.stringify(data.user));
   };
 
   const logout = () => {

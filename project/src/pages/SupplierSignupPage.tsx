@@ -13,6 +13,8 @@ interface FormData {
 }
 
 export default function SupplierSignupPage() {
+  const { signup } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<FormData>({
     name: '',
     cnpj: '',
@@ -24,8 +26,6 @@ export default function SupplierSignupPage() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  const navigate = useNavigate();
   
   const validateCNPJ = (cnpj: string) => {
     cnpj = cnpj.replace(/[^\d]/g, '');
@@ -89,26 +89,28 @@ export default function SupplierSignupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
     // Validate CNPJ
     if (!validateCNPJ(formData.cnpj.replace(/\D/g, ''))) {
       setError('CNPJ inválido');
       return;
     }
-    
     // Validate required fields
     if (!Object.values(formData).every(value => value.trim())) {
       setError('Por favor, preencha todos os campos');
       return;
     }
-    
     try {
       setLoading(true);
-      // Here you would typically make an API call to register the supplier
-      console.log('Supplier registration data:', formData);
+      await signup(
+        formData.name,
+        formData.email,
+        formData.password,
+        'fornecedor',
+        formData.cnpj
+      );
       navigate('/login');
-    } catch (err) {
-      setError('Erro ao cadastrar fornecedor');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao cadastrar fornecedor');
       console.error(err);
     } finally {
       setLoading(false);

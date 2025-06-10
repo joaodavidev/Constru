@@ -29,10 +29,10 @@ export default function SignupPage() {
     try {
       setError('');
       setLoading(true);
-      await signup(name, email, password);
+      await signup(name, email, password, 'cliente');
       navigate('/');
-    } catch (err) {
-      setError('Failed to create an account');
+    } catch (err: any) {
+      setError(err.message || 'Failed to create an account');
       console.error(err);
     } finally {
       setLoading(false);
