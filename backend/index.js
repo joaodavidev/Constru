@@ -193,6 +193,65 @@ app.delete('/ofertas/:id', async (req, res) => {
   }
 });
 
+// Rotas para avaliações (reviews)
+app.get('/avaliacoes', async (req, res) => {
+  const { produto_id, fornecedor_id } = req.query;
+  try {
+    let result;
+    if (produto_id) {
+      result = await pool.query(
+        `SELECT a.*, u.nome as usuario_nome FROM avaliacoes a
+         JOIN usuarios u ON a.usuario_id = u.id
+         WHERE a.produto_id = $1
+         ORDER BY a.data_avaliacao DESC`,
+        [produto_id]
+      );
+    } else if (fornecedor_id) {
+      // Busca avaliações de todos os produtos de um fornecedor
+      result = await pool.query(
+        `SELECT a.*, u.nome as usuario_nome FROM avaliacoes a
+         JOIN usuarios u ON a.usuario_id = u.id
+         JOIN ofertas o ON a.produto_id = o.produto_id
+         WHERE o.fornecedor_id = $1
+         ORDER BY a.data_avaliacao DESC`,
+        [fornecedor_id]
+      );
+    } else {
+      return res.status(400).json({ error: 'produto_id ou fornecedor_id é obrigatório' });
+    }
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar avaliações' });
+  }
+});
+
+app.post('/avaliacoes', async (req, res) => {
+  const { usuario_id, produto_id, nota, comentario } = req.body;
+  if (!usuario_id || !produto_id || !nota) {
+    return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
+  }
+  if (nota < 1 || nota > 5) {
+    return res.status(400).json({ error: 'Nota deve ser entre 1 e 5' });
+  }
+  try {
+    // Opcional: impedir múltiplas avaliações do mesmo usuário para o mesmo produto
+    const exists = await pool.query(
+      'SELECT 1 FROM avaliacoes WHERE usuario_id = $1 AND produto_id = $2',
+      [usuario_id, produto_id]
+    );
+    if (exists.rows.length > 0) {
+      return res.status(409).json({ error: 'Você já avaliou este produto' });
+    }
+    const result = await pool.query(
+      'INSERT INTO avaliacoes (usuario_id, produto_id, nota, comentario) VALUES ($1, $2, $3, $4) RETURNING *',
+      [usuario_id, produto_id, nota, comentario || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao criar avaliação' });
+  }
+});
+
 app.listen(3001, () => {
   console.log('Servidor rodando em http://localhost:3001');
 });
