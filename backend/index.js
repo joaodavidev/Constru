@@ -252,6 +252,87 @@ app.post('/avaliacoes', async (req, res) => {
   }
 });
 
+// Rotas para suporte ao usuário
+// Listar tickets de um usuário
+app.get('/suporte/tickets', async (req, res) => {
+  const { usuario_id } = req.query;
+  if (!usuario_id) return res.status(400).json({ error: 'usuario_id é obrigatório' });
+  try {
+    const result = await pool.query(
+      'SELECT * FROM suporte_tickets WHERE usuario_id = $1 ORDER BY criado_em DESC',
+      [usuario_id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar tickets' });
+  }
+});
+
+// Abrir novo ticket
+app.post('/suporte/tickets', async (req, res) => {
+  const { usuario_id } = req.body;
+  if (!usuario_id) return res.status(400).json({ error: 'usuario_id é obrigatório' });
+  try {
+    const result = await pool.query(
+      'INSERT INTO suporte_tickets (usuario_id) VALUES ($1) RETURNING *',
+      [usuario_id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao abrir ticket' });
+  }
+});
+
+// Listar mensagens de um ticket
+app.get('/suporte/mensagens', async (req, res) => {
+  const { ticket_id } = req.query;
+  if (!ticket_id) return res.status(400).json({ error: 'ticket_id é obrigatório' });
+  try {
+    const result = await pool.query(
+      `SELECT m.*, u.nome as remetente_nome FROM suporte_mensagens m
+       JOIN usuarios u ON m.remetente_id = u.id
+       WHERE m.ticket_id = $1 ORDER BY m.enviada_em ASC`,
+      [ticket_id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar mensagens' });
+  }
+});
+
+// Enviar mensagem em um ticket
+app.post('/suporte/mensagens', async (req, res) => {
+  const { ticket_id, remetente_id, mensagem } = req.body;
+  if (!ticket_id || !remetente_id || !mensagem) {
+    return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
+  }
+  try {
+    const result = await pool.query(
+      'INSERT INTO suporte_mensagens (ticket_id, remetente_id, mensagem) VALUES ($1, $2, $3) RETURNING *',
+      [ticket_id, remetente_id, mensagem]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao enviar mensagem' });
+  }
+});
+
+// Alterar status do ticket (encerrar, responder, etc)
+app.put('/suporte/tickets/:id', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  if (!status) return res.status(400).json({ error: 'status é obrigatório' });
+  try {
+    await pool.query(
+      'UPDATE suporte_tickets SET status = $1 WHERE id = $2',
+      [status, id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao atualizar status do ticket' });
+  }
+});
+
 app.listen(3001, () => {
   console.log('Servidor rodando em http://localhost:3001');
 });
