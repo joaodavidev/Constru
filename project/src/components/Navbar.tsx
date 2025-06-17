@@ -29,6 +29,7 @@ export default function Navbar() {
           <Link to="/" className="font-medium hover:text-primary">Início</Link>
           <Link to="/products" className="font-medium hover:text-primary">Produtos</Link>
           <Link to="/categories" className="font-medium hover:text-primary">Categorias</Link>
+          <Link to="/support" className="font-medium hover:text-primary">Suporte</Link>
         </nav>
 
         {/* Search & Actions */}
@@ -67,6 +68,7 @@ export default function Navbar() {
             <Link to="/" className="block py-2 hover:text-primary" onClick={toggleMenu}>Início</Link>
             <Link to="/products" className="block py-2 hover:text-primary" onClick={toggleMenu}>Produtos</Link>
             <Link to="/categories" className="block py-2 hover:text-primary" onClick={toggleMenu}>Categorias</Link>
+            <Link to="/support" className="block py-2 hover:text-primary" onClick={toggleMenu}>Suporte</Link>
           </div>
         </div>
       )}
