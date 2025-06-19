@@ -99,3 +99,46 @@ CREATE TABLE suporte_mensagens (
   mensagem TEXT NOT NULL,
   enviada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Carrinho de compras persistente
+CREATE TABLE IF NOT EXISTS carrinhos (
+  id SERIAL PRIMARY KEY,
+  usuario_id INT REFERENCES usuarios(id), -- pode ser NULL para anônimo
+  token VARCHAR(100), -- identificador para carrinho anônimo
+  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS itens_carrinho (
+  id SERIAL PRIMARY KEY,
+  carrinho_id INT REFERENCES carrinhos(id) ON DELETE CASCADE,
+  oferta_id INT REFERENCES ofertas(id),
+  quantidade INT NOT NULL CHECK (quantidade > 0),
+  preco_unitario DECIMAL(10,2) NOT NULL
+);
+
+-- Chat pós-compra entre cliente e fornecedor por pedido
+CREATE TABLE IF NOT EXISTS chats_pedido (
+  id SERIAL PRIMARY KEY,
+  pedido_id INT REFERENCES pedidos(id) ON DELETE CASCADE,
+  cliente_id INT REFERENCES usuarios(id),
+  fornecedor_id INT REFERENCES usuarios(id),
+  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS mensagens_chat_pedido (
+  id SERIAL PRIMARY KEY,
+  chat_id INT REFERENCES chats_pedido(id) ON DELETE CASCADE,
+  remetente_id INT REFERENCES usuarios(id),
+  mensagem TEXT NOT NULL,
+  lida BOOLEAN DEFAULT FALSE,
+  enviada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Notificações de mensagens não lidas por chat
+CREATE TABLE IF NOT EXISTS notificacoes_chat_pedido (
+  id SERIAL PRIMARY KEY,
+  chat_id INT REFERENCES chats_pedido(id) ON DELETE CASCADE,
+  destinatario_id INT REFERENCES usuarios(id),
+  quantidade INT DEFAULT 0
+);

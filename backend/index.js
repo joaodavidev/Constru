@@ -333,6 +333,215 @@ app.put('/suporte/tickets/:id', async (req, res) => {
   }
 });
 
+// Rotas para Carrinho de Compras
+// Criar ou buscar carrinho (anônimo ou autenticado)
+app.post('/carrinho', async (req, res) => {
+  const { usuario_id, token } = req.body;
+  try {
+    let carrinho;
+    if (usuario_id) {
+      const result = await pool.query('SELECT * FROM carrinhos WHERE usuario_id = $1', [usuario_id]);
+      carrinho = result.rows[0];
+      if (!carrinho) {
+        const novo = await pool.query('INSERT INTO carrinhos (usuario_id) VALUES ($1) RETURNING *', [usuario_id]);
+        carrinho = novo.rows[0];
+      }
+    } else if (token) {
+      const result = await pool.query('SELECT * FROM carrinhos WHERE token = $1', [token]);
+      carrinho = result.rows[0];
+      if (!carrinho) {
+        const novo = await pool.query('INSERT INTO carrinhos (token) VALUES ($1) RETURNING *', [token]);
+        carrinho = novo.rows[0];
+      }
+    } else {
+      return res.status(400).json({ error: 'usuario_id ou token é obrigatório' });
+    }
+    res.json(carrinho);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar/criar carrinho' });
+  }
+});
+
+// Buscar itens do carrinho
+app.get('/carrinho/:id/itens', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT ic.*, o.preco, o.estoque, p.nome as produto_nome, p.imagem
+       FROM itens_carrinho ic
+       JOIN ofertas o ON ic.oferta_id = o.id
+       JOIN produtos p ON o.produto_id = p.id
+       WHERE ic.carrinho_id = $1`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar itens do carrinho' });
+  }
+});
+
+// Adicionar item ao carrinho
+app.post('/carrinho/:id/item', async (req, res) => {
+  const { id } = req.params;
+  const { oferta_id, quantidade, preco_unitario } = req.body;
+  if (!oferta_id || !quantidade || !preco_unitario) {
+    return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
+  }
+  try {
+    // Verifica se já existe o item
+    const exists = await pool.query('SELECT * FROM itens_carrinho WHERE carrinho_id = $1 AND oferta_id = $2', [id, oferta_id]);
+    if (exists.rows.length > 0) {
+      // Atualiza quantidade
+      const novoQtd = exists.rows[0].quantidade + quantidade;
+      await pool.query('UPDATE itens_carrinho SET quantidade = $1 WHERE id = $2', [novoQtd, exists.rows[0].id]);
+      return res.json({ success: true, updated: true });
+    }
+    await pool.query(
+      'INSERT INTO itens_carrinho (carrinho_id, oferta_id, quantidade, preco_unitario) VALUES ($1, $2, $3, $4)',
+      [id, oferta_id, quantidade, preco_unitario]
+    );
+    res.status(201).json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao adicionar item ao carrinho' });
+  }
+});
+
+// Atualizar quantidade de um item do carrinho
+app.put('/carrinho/item/:item_id', async (req, res) => {
+  const { item_id } = req.params;
+  const { quantidade } = req.body;
+  if (!quantidade) return res.status(400).json({ error: 'quantidade é obrigatória' });
+  try {
+    await pool.query('UPDATE itens_carrinho SET quantidade = $1 WHERE id = $2', [quantidade, item_id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao atualizar item do carrinho' });
+  }
+});
+
+// Remover item do carrinho
+app.delete('/carrinho/item/:item_id', async (req, res) => {
+  const { item_id } = req.params;
+  try {
+    await pool.query('DELETE FROM itens_carrinho WHERE id = $1', [item_id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao remover item do carrinho' });
+  }
+});
+
+// Migrar carrinho anônimo para usuário autenticado
+app.post('/carrinho/migrar', async (req, res) => {
+  const { token, usuario_id } = req.body;
+  if (!token || !usuario_id) return res.status(400).json({ error: 'token e usuario_id são obrigatórios' });
+  try {
+    // Busca carrinho anônimo
+    const result = await pool.query('SELECT * FROM carrinhos WHERE token = $1', [token]);
+    const carrinho = result.rows[0];
+    if (!carrinho) return res.status(404).json({ error: 'Carrinho não encontrado' });
+    // Atualiza carrinho para vincular ao usuário
+    await pool.query('UPDATE carrinhos SET usuario_id = $1, token = NULL WHERE id = $2', [usuario_id, carrinho.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao migrar carrinho' });
+  }
+});
+
+// Rotas para Chat Pós-Compra (cliente <-> fornecedor por pedido)
+// Criar chat para um pedido (após pagamento)
+app.post('/chat-pedido', async (req, res) => {
+  const { pedido_id, cliente_id, fornecedor_id } = req.body;
+  if (!pedido_id || !cliente_id || !fornecedor_id) {
+    return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
+  }
+  try {
+    // Garante que não existe chat duplicado
+    const exists = await pool.query('SELECT * FROM chats_pedido WHERE pedido_id = $1 AND fornecedor_id = $2', [pedido_id, fornecedor_id]);
+    if (exists.rows.length > 0) return res.json(exists.rows[0]);
+    const result = await pool.query(
+      'INSERT INTO chats_pedido (pedido_id, cliente_id, fornecedor_id) VALUES ($1, $2, $3) RETURNING *',
+      [pedido_id, cliente_id, fornecedor_id]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao criar chat do pedido' });
+  }
+});
+
+// Buscar chat e mensagens de um pedido
+app.get('/chat-pedido/:pedido_id/:fornecedor_id', async (req, res) => {
+  const { pedido_id, fornecedor_id } = req.params;
+  try {
+    const chat = await pool.query('SELECT * FROM chats_pedido WHERE pedido_id = $1 AND fornecedor_id = $2', [pedido_id, fornecedor_id]);
+    if (chat.rows.length === 0) return res.status(404).json({ error: 'Chat não encontrado' });
+    const mensagens = await pool.query(
+      'SELECT m.*, u.nome as remetente_nome FROM mensagens_chat_pedido m JOIN usuarios u ON m.remetente_id = u.id WHERE m.chat_id = $1 ORDER BY m.enviada_em ASC',
+      [chat.rows[0].id]
+    );
+    res.json({ chat: chat.rows[0], mensagens: mensagens.rows });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar chat/mensagens' });
+  }
+});
+
+// Enviar mensagem no chat
+app.post('/chat-pedido/:chat_id/mensagem', async (req, res) => {
+  const { chat_id } = req.params;
+  const { remetente_id, mensagem } = req.body;
+  if (!remetente_id || !mensagem) {
+    return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
+  }
+  try {
+    const result = await pool.query(
+      'INSERT INTO mensagens_chat_pedido (chat_id, remetente_id, mensagem) VALUES ($1, $2, $3) RETURNING *',
+      [chat_id, remetente_id, mensagem]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao enviar mensagem' });
+  }
+});
+
+// Buscar mensagens do chat
+app.get('/chat-pedido/:chat_id/mensagens', async (req, res) => {
+  const { chat_id } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT m.*, u.nome as remetente_nome FROM mensagens_chat_pedido m JOIN usuarios u ON m.remetente_id = u.id WHERE m.chat_id = $1 ORDER BY m.enviada_em ASC',
+      [chat_id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar mensagens do chat' });
+  }
+});
+
+// Buscar notificações de mensagens não lidas
+app.get('/chat-pedido/:chat_id/notificacoes/:destinatario_id', async (req, res) => {
+  const { chat_id, destinatario_id } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT * FROM notificacoes_chat_pedido WHERE chat_id = $1 AND destinatario_id = $2',
+      [chat_id, destinatario_id]
+    );
+    res.json(result.rows[0] || { quantidade: 0 });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar notificações' });
+  }
+});
+
+// Marcar mensagens como lidas e zerar notificações
+app.put('/chat-pedido/:chat_id/notificacoes/:destinatario_id', async (req, res) => {
+  const { chat_id, destinatario_id } = req.params;
+  try {
+    await pool.query('UPDATE mensagens_chat_pedido SET lida = TRUE WHERE chat_id = $1 AND remetente_id != $2', [chat_id, destinatario_id]);
+    await pool.query('UPDATE notificacoes_chat_pedido SET quantidade = 0 WHERE chat_id = $1 AND destinatario_id = $2', [chat_id, destinatario_id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao atualizar notificações' });
+  }
+});
+
 app.listen(3001, () => {
   console.log('Servidor rodando em http://localhost:3001');
 });

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, User, Menu, X, Hammer } from 'lucide-react';
+import { Search, User, Menu, X, Hammer, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 
 export default function Navbar() {
   const { isAuthenticated, user } = useAuth();
+  const { cartCount } = useCart();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -41,7 +43,18 @@ export default function Navbar() {
           >
             <Search size={20} />
           </button>
-          
+          <Link 
+            to="/cart"
+            className="relative p-2 hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="Carrinho"
+          >
+            <ShoppingCart size={20} />
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full px-1.5 py-0.5">
+                {cartCount}
+              </span>
+            )}
+          </Link>
           <Link 
             to={isAuthenticated ? "/account" : "/login"}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -49,7 +62,6 @@ export default function Navbar() {
           >
             <User size={20} />
           </Link>
-          
           {/* Mobile Menu Button */}
           <button 
             className="md:hidden p-2 hover:bg-gray-100 rounded-full transition-colors"

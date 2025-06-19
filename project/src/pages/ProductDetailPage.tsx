@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Star, ChevronLeft } from 'lucide-react';
+import { Star, ChevronLeft, ShoppingCart } from 'lucide-react';
 import { getProductById, getProductsByCategory } from '../data/products';
+import { useCart } from '../context/CartContext';
+import { Oferta } from '../types/supplier';
+import { toast } from 'react-toastify';
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +17,8 @@ export default function ProductDetailPage() {
   const [enviandoAvaliacao, setEnviandoAvaliacao] = useState(false);
   const [erroAvaliacao, setErroAvaliacao] = useState<string|null>(null);
   const [avaliacaoEnviada, setAvaliacaoEnviada] = useState(false);
+  const { addToCart } = useCart();
+  const [addingId, setAddingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -180,7 +185,27 @@ export default function ProductDetailPage() {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-semibold">R$ {supplier.price.toFixed(2)}/kg</div>
-                  <button className="btn btn-primary mt-2">Entrar em contato</button>
+                  {usandoOfertasReais ? (
+                    <button
+                      className="btn btn-primary mt-2 flex items-center gap-2"
+                      disabled={addingId === supplier.id}
+                      onClick={async () => {
+                        setAddingId(supplier.id);
+                        const oferta = ofertas.find(o => o.id === supplier.id);
+                        if (oferta) {
+                          await addToCart(oferta, 1);
+                          toast.success('Produto adicionado ao carrinho!');
+                        }
+                        setAddingId(null);
+                      }}
+                    >
+                      <ShoppingCart size={18} /> Adicionar ao carrinho
+                    </button>
+                  ) : (
+                    <button className="btn btn-primary mt-2 flex items-center gap-2" disabled>
+                      <ShoppingCart size={18} /> Adicionar ao carrinho
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
