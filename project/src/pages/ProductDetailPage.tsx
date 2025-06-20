@@ -244,7 +244,27 @@ export default function ProductDetailPage() {
                     <span className="ml-2 text-sm text-gray-500">{supplier.rating.toFixed(1)}</span>
                   )}
                 </div>
-                <button className="btn btn-primary">Entrar em contato</button>
+                {usandoOfertasReais ? (
+                  <button
+                    className="btn btn-primary flex items-center gap-2"
+                    disabled={addingId === supplier.id}
+                    onClick={async () => {
+                      setAddingId(supplier.id);
+                      const oferta = ofertas.find(o => o.id === supplier.id);
+                      if (oferta) {
+                        await addToCart(oferta, 1);
+                        toast.success('Produto adicionado ao carrinho!');
+                      }
+                      setAddingId(null);
+                    }}
+                  >
+                    <ShoppingCart size={18} /> Adicionar ao carrinho
+                  </button>
+                ) : (
+                  <button className="btn btn-primary flex items-center gap-2" disabled>
+                    <ShoppingCart size={18} /> Adicionar ao carrinho
+                  </button>
+                )}
               </div>
               {/* Avaliações reais ou mocks */}
               {supplier.reviews && supplier.reviews.length > 0 ? (
