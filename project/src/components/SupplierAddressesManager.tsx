@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Endereco } from '../types/supplier';
+import { API_BASE_URL } from '../api';
 
 export default function SupplierAddressesManager({
   enderecos,
@@ -31,7 +32,7 @@ export default function SupplierAddressesManager({
     }
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/enderecos', {
+      const res = await fetch(`${API_BASE_URL}/enderecos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...novoEndereco, usuario_id: fornecedorId })
@@ -58,7 +59,7 @@ export default function SupplierAddressesManager({
     setDeleteInfo(null);
     setDeleteId(id);
     try {
-      const res = await fetch(`http://localhost:3001/enderecos/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE_URL}/enderecos/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json();
         if (data.produtos) {

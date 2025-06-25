@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../api';
 
 export default function SupportPage() {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -14,7 +15,7 @@ export default function SupportPage() {
   // Buscar tickets do usuário
   useEffect(() => {
     setLoadingTickets(true);
-    fetch(`http://localhost:3001/suporte/tickets?usuario_id=${usuario_id}`)
+    fetch(`${API_BASE_URL}/suporte/tickets?usuario_id=${usuario_id}`)
       .then(res => res.json())
       .then(data => setTickets(Array.isArray(data) ? data : []))
       .catch(() => setTickets([]))
@@ -24,7 +25,7 @@ export default function SupportPage() {
   // Buscar mensagens do ticket selecionado
   useEffect(() => {
     if (!selectedTicket) return;
-    fetch(`http://localhost:3001/suporte/mensagens?ticket_id=${selectedTicket.id}`)
+    fetch(`${API_BASE_URL}/suporte/mensagens?ticket_id=${selectedTicket.id}`)
       .then(res => res.json())
       .then(data => setMensagens(Array.isArray(data) ? data : []))
       .catch(() => setMensagens([]));
@@ -35,7 +36,7 @@ export default function SupportPage() {
     setAbrindoTicket(true);
     setErro(null);
     try {
-      const res = await fetch('http://localhost:3001/suporte/tickets', {
+      const res = await fetch(`${API_BASE_URL}/suporte/tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ usuario_id })
@@ -58,7 +59,7 @@ export default function SupportPage() {
     setEnviando(true);
     setErro(null);
     try {
-      const res = await fetch('http://localhost:3001/suporte/mensagens', {
+      const res = await fetch(`${API_BASE_URL}/suporte/mensagens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -70,7 +71,7 @@ export default function SupportPage() {
       if (!res.ok) throw new Error('Erro ao enviar mensagem');
       setNovaMensagem('');
       // reload mensagens
-      fetch(`http://localhost:3001/suporte/mensagens?ticket_id=${selectedTicket.id}`)
+      fetch(`${API_BASE_URL}/suporte/mensagens?ticket_id=${selectedTicket.id}`)
         .then(res => res.json())
         .then(data => setMensagens(Array.isArray(data) ? data : []));
     } catch (err: any) {
@@ -128,7 +129,7 @@ export default function SupportPage() {
                       <span className="text-xs text-gray-400">{new Date(msg.enviada_em).toLocaleString()}</span>
                     </div>
                   ))
-                )}
+                }
               </div>
               <form onSubmit={enviarMensagem} className="flex gap-2">
                 <input

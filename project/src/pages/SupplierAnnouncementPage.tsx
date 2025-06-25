@@ -4,6 +4,7 @@ import { products } from '../data/products';
 import { Oferta, Endereco } from '../types/supplier';
 import { useSupplierOfertas, useSupplierEnderecos } from './hooksSupplier';
 import SupplierAddressesManager from '../components/SupplierAddressesManager';
+import { API_BASE_URL } from '../api';
 
 function CreateAnnouncementModal({
   open, onClose, produto, enderecos, onEnderecoCreated, onSuccess, fornecedorId
@@ -40,7 +41,7 @@ function CreateAnnouncementModal({
     }
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/ofertas', {
+      const res = await fetch(`${API_BASE_URL}/ofertas`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -74,7 +75,7 @@ function CreateAnnouncementModal({
       return;
     }
     try {
-      const res = await fetch('http://localhost:3001/enderecos', {
+      const res = await fetch(`${API_BASE_URL}/enderecos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...novoEndereco, usuario_id: fornecedorId })
@@ -167,7 +168,7 @@ export default function SupplierAnnouncementPage() {
   };
   const handleSuccess = () => {
     // Atualiza lista de ofertas após criar anúncio
-    fetch(`http://localhost:3001/ofertas?fornecedor_id=${fornecedorId}`)
+    fetch(`${API_BASE_URL}/ofertas?fornecedor_id=${fornecedorId}`)
       .then(res => res.json())
       .then(data => setOfertas(data));
   };
@@ -175,9 +176,9 @@ export default function SupplierAnnouncementPage() {
   // Função para remover anúncio
   const handleRemove = async (ofertaId: number) => {
     if (!window.confirm('Tem certeza que deseja remover este anúncio?')) return;
-    await fetch(`http://localhost:3001/ofertas/${ofertaId}`, { method: 'DELETE' });
+    await fetch(`${API_BASE_URL}/ofertas/${ofertaId}`, { method: 'DELETE' });
     // Atualiza lista após remoção
-    fetch(`http://localhost:3001/ofertas?fornecedor_id=${fornecedorId}`)
+    fetch(`${API_BASE_URL}/ofertas?fornecedor_id=${fornecedorId}`)
       .then(res => res.json())
       .then(data => setOfertas(data));
   };
@@ -212,7 +213,7 @@ export default function SupplierAnnouncementPage() {
     }
     setEditLoading(true);
     try {
-      const res = await fetch(`http://localhost:3001/ofertas/${editOferta.id}`, {
+      const res = await fetch(`${API_BASE_URL}/ofertas/${editOferta.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ preco: Number(editPreco), estoque: Number(editEstoque), endereco_id: editEnderecoId })
@@ -226,7 +227,7 @@ export default function SupplierAnnouncementPage() {
       setEditLoading(false);
       setEditOferta(null);
       // Atualiza lista após edição
-      fetch(`http://localhost:3001/ofertas?fornecedor_id=${fornecedorId}`)
+      fetch(`${API_BASE_URL}/ofertas?fornecedor_id=${fornecedorId}`)
         .then(res => res.json())
         .then(data => setOfertas(data));
     } catch {

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
+import { API_BASE_URL } from '../api';
 
 interface AuthContextType {
   user: User | null;
@@ -33,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     // Chama a API de login do backend
-    const response = await fetch('http://localhost:3001/login', {
+    const response = await fetch(`${API_BASE_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, senha: password })
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (name: string, email: string, password: string, tipo_usuario: string = 'cliente', cnpj?: string) => {
     // Chama a API de cadastro do backend
-    const response = await fetch('http://localhost:3001/usuarios', {
+    const response = await fetch(`${API_BASE_URL}/usuarios`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nome: name, email, senha: password, tipo_usuario, cnpj })

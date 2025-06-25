@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Oferta, Endereco } from '../types/supplier';
+import { API_BASE_URL } from '../api';
 
 export function useSupplierOfertas(fornecedorId: number | string | undefined) {
   const [ofertas, setOfertas] = useState<Oferta[]>([]);
@@ -9,7 +10,7 @@ export function useSupplierOfertas(fornecedorId: number | string | undefined) {
   useEffect(() => {
     if (!fornecedorId) return;
     setLoading(true);
-    fetch(`http://localhost:3001/ofertas?fornecedor_id=${fornecedorId}`)
+    fetch(`${API_BASE_URL}/ofertas?fornecedor_id=${fornecedorId}`)
       .then(res => res.json())
       .then(data => {
         setOfertas(data);
@@ -30,7 +31,7 @@ export function useSupplierEnderecos(usuarioId: number | string | undefined) {
   useEffect(() => {
     if (!usuarioId) return;
     setLoading(true);
-    fetch(`http://localhost:3001/enderecos?usuario_id=${usuarioId}`)
+    fetch(`${API_BASE_URL}/enderecos?usuario_id=${usuarioId}`)
       .then(res => res.json())
       .then(data => {
         setEnderecos(data);

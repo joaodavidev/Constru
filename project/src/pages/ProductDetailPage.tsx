@@ -5,6 +5,7 @@ import { getProductById, getProductsByCategory } from '../data/products';
 import { useCart } from '../context/CartContext';
 import { Oferta } from '../types/supplier';
 import { toast } from 'react-toastify';
+import { API_BASE_URL } from '../api';
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -23,7 +24,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!id) return;
     setLoadingOfertas(true);
-    fetch(`http://localhost:3001/ofertas?produto_id=${id}`)
+    fetch(`${API_BASE_URL}/ofertas?produto_id=${id}`)
       .then(res => res.json())
       .then(data => setOfertas(Array.isArray(data) ? data : []))
       .catch(() => setOfertas([]))
@@ -33,7 +34,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!id) return;
     setLoadingAvaliacoes(true);
-    fetch(`http://localhost:3001/avaliacoes?produto_id=${id}`)
+    fetch(`${API_BASE_URL}/avaliacoes?produto_id=${id}`)
       .then(res => res.json())
       .then(data => setAvaliacoes(Array.isArray(data) ? data : []))
       .catch(() => setAvaliacoes([]))
@@ -310,7 +311,7 @@ export default function ProductDetailPage() {
                       try {
                         // TODO: pegar usuario_id real do contexto de auth
                         const usuario_id = localStorage.getItem('userId') || 1;
-                        const res = await fetch('http://localhost:3001/avaliacoes', {
+                        const res = await fetch(`${API_BASE_URL}/avaliacoes`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
