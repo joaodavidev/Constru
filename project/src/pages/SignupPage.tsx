@@ -17,12 +17,12 @@ export default function SignupPage() {
     e.preventDefault();
     
     if (!name || !email || !password) {
-      setError('Please fill in all fields');
+      setError('Por favor, preencha todos os campos');
       return;
     }
     
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError('Senhas não coincidem');
       return;
     }
     
@@ -32,7 +32,7 @@ export default function SignupPage() {
       await signup(name, email, password, 'cliente');
       navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Failed to create an account');
+      setError(err.message || 'Falha ao criar conta. Por favor, tente novamente.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -42,7 +42,7 @@ export default function SignupPage() {
   return (
     <div className="container py-12">
       <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-8">
-        <h1 className="text-2xl font-semibold mb-6 text-center">Create an Account</h1>
+        <h1 className="text-2xl font-semibold mb-6 text-center">Crie uma conta</h1>
         
         {error && (
           <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
@@ -53,7 +53,7 @@ export default function SignupPage() {
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-              Full Name
+              Nome completo
             </label>
             <input
               id="name"
@@ -61,7 +61,7 @@ export default function SignupPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="input"
-              placeholder="John Doe"
+              placeholder="João da Silva"
             />
           </div>
           
@@ -75,7 +75,7 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input"
-              placeholder="your@email.com"
+              placeholder="seu@email.com"
             />
           </div>
           
@@ -95,7 +95,7 @@ export default function SignupPage() {
           
           <div className="mb-6">
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-              Confirm Password
+              Confirme sua senha
             </label>
             <input
               id="confirmPassword"
@@ -112,15 +112,15 @@ export default function SignupPage() {
             className="btn btn-primary w-full"
             disabled={loading}
           >
-            {loading ? 'Creating account...' : 'Create Account'}
+            {loading ? 'Criando conta...' : 'Criar conta'}
           </button>
         </form>
         
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            Already have an account?{' '}
+            Já possui uma conta?{' '}
             <Link to="/login" className="text-primary hover:text-primary/80 font-medium">
-              Sign in
+              Entre na sua conta
             </Link>
           </p>
         </div>
