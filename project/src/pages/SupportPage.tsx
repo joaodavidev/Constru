@@ -81,6 +81,19 @@ export default function SupportPage() {
     }
   };
 
+  // Deletar ticket
+  const deletarTicket = async (ticketId: number) => {
+    if (!window.confirm('Tem certeza que deseja deletar este chamado?')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/suporte/tickets/${ticketId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Erro ao deletar chamado');
+      setTickets(t => t.filter(tk => tk.id !== ticketId));
+      if (selectedTicket && selectedTicket.id === ticketId) setSelectedTicket(null);
+    } catch (err: any) {
+      setErro(err.message);
+    }
+  };
+
   return (
     <div className="container py-8 max-w-2xl mx-auto">
       <h1 className="text-3xl font-semibold mb-6">Suporte ao Usuário</h1>
@@ -101,12 +114,19 @@ export default function SupportPage() {
           ) : (
             <ul className="space-y-2">
               {tickets.map(ticket => (
-                <li key={ticket.id}>
+                <li key={ticket.id} className="flex items-center gap-2">
                   <button
-                    className={`w-full text-left p-2 rounded ${selectedTicket && selectedTicket.id === ticket.id ? 'bg-primary text-white' : 'bg-gray-100'}`}
+                    className={`flex-1 text-left p-2 rounded ${selectedTicket && selectedTicket.id === ticket.id ? 'bg-primary text-white' : 'bg-gray-100'}`}
                     onClick={() => setSelectedTicket(ticket)}
                   >
                     #{ticket.id} - {ticket.status}
+                  </button>
+                  <button
+                    className="text-red-600 hover:underline text-xs"
+                    onClick={() => deletarTicket(ticket.id)}
+                    title="Deletar chamado"
+                  >
+                    Deletar
                   </button>
                 </li>
               ))}
@@ -129,7 +149,7 @@ export default function SupportPage() {
                       <span className="text-xs text-gray-400">{new Date(msg.enviada_em).toLocaleString()}</span>
                     </div>
                   ))
-                }
+                )}
               </div>
               <form onSubmit={enviarMensagem} className="flex gap-2">
                 <input

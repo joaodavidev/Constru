@@ -1,5 +1,7 @@
 const express = require('express');
 const app = express();
+const cors = require('cors');
+app.use(cors());
 const pool = require('./db');
 
 app.use(express.json());
@@ -57,6 +59,38 @@ app.post('/usuarios', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao cadastrar usuário' });
+  }
+});
+
+// Atualizar dados do usuário
+app.put('/usuarios/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nome, email, senha, tipo_usuario, cpf, cnpj } = req.body;
+  if (!nome && !email && !senha && !tipo_usuario && !cpf && !cnpj) {
+    return res.status(400).json({ error: 'Nenhum dado para atualizar.' });
+  }
+  try {
+    // Monta dinamicamente os campos a serem atualizados
+    const fields = [];
+    const values = [];
+    if (nome) { fields.push('nome = ?'); values.push(nome); }
+    if (email) { fields.push('email = ?'); values.push(email); }
+    if (senha) { fields.push('senha = ?'); values.push(senha); }
+    if (tipo_usuario) { fields.push('tipo_usuario = ?'); values.push(tipo_usuario); }
+    if (cpf) { fields.push('cpf = ?'); values.push(cpf); }
+    if (cnpj) { fields.push('cnpj = ?'); values.push(cnpj); }
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'Nenhum campo válido para atualizar.' });
+    }
+    values.push(id);
+    await pool.query(`UPDATE usuarios SET ${fields.join(', ')} WHERE id = ?`, values);
+    const [userRows] = await pool.query('SELECT id, nome, email, tipo_usuario, cpf, cnpj FROM usuarios WHERE id = ?', [id]);
+    res.json({ user: userRows[0] });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'E-mail já cadastrado.' });
+    }
+    res.status(500).json({ error: 'Erro ao atualizar usuário.' });
   }
 });
 
@@ -322,6 +356,19 @@ app.put('/suporte/tickets/:id', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao atualizar status do ticket' });
+  }
+});
+
+// Deletar ticket de suporte
+app.delete('/suporte/tickets/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Remove mensagens vinculadas (ON DELETE CASCADE já cobre, mas por segurança)
+    await pool.query('DELETE FROM suporte_mensagens WHERE ticket_id = ?', [id]);
+    await pool.query('DELETE FROM suporte_tickets WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao deletar ticket' });
   }
 });
 
