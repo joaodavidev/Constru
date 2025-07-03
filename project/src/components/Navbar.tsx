@@ -32,6 +32,9 @@ export default function Navbar() {
           <Link to="/products" className="font-medium hover:text-primary">Produtos</Link>
           <Link to="/categories" className="font-medium hover:text-primary">Categorias</Link>
           <Link to="/support" className="font-medium hover:text-primary">Suporte</Link>
+          {isAuthenticated && user?.tipo_usuario === 'fornecedor' && (
+            <Link to="/supplier/dashboard" className="font-medium hover:text-primary">Painel do Fornecedor</Link>
+          )}
         </nav>
 
         {/* Search & Actions */}
@@ -81,6 +84,9 @@ export default function Navbar() {
             <Link to="/products" className="block py-2 hover:text-primary" onClick={toggleMenu}>Produtos</Link>
             <Link to="/categories" className="block py-2 hover:text-primary" onClick={toggleMenu}>Categorias</Link>
             <Link to="/support" className="block py-2 hover:text-primary" onClick={toggleMenu}>Suporte</Link>
+            {isAuthenticated && user?.tipo_usuario === 'fornecedor' && (
+              <Link to="/supplier/dashboard" className="block py-2 hover:text-primary" onClick={toggleMenu}>Painel do Fornecedor</Link>
+            )}
           </div>
         </div>
       )}
