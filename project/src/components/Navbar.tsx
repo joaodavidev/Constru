@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, User, Menu, X, Hammer, ShoppingCart } from 'lucide-react';
+import { Search, User, Menu, X, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import logoConstru from '/images/logo-constru.png';
 
 export default function Navbar() {
   const { isAuthenticated, user } = useAuth();
@@ -19,9 +20,13 @@ export default function Navbar() {
         {/* Logo */}
         <Link to="/" className="flex items-center">
           <div className="flex items-center">
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-              <Hammer size={20} className="text-secondary" />
-            </div>
+            <img
+              src={logoConstru}
+              alt="Logo Constru+"
+              className="h-8 w-auto object-contain bg-white border border-primary p-0.5 rounded-full"
+              style={{ background: 'white' }}
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
             <span className="ml-2 text-xl font-bold text-primary">Constru+</span>
           </div>
         </Link>
