@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, User, Menu, X, ShoppingCart } from 'lucide-react';
+import { Search, User, Menu, X, Hammer, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import logoConstru from '/images/logo-constru.png';
 
 export default function Navbar() {
   const { isAuthenticated, user } = useAuth();
@@ -20,13 +19,9 @@ export default function Navbar() {
         {/* Logo */}
         <Link to="/" className="flex items-center">
           <div className="flex items-center">
-            <img
-              src={logoConstru}
-              alt="Logo Constru+"
-              className="h-8 w-auto object-contain bg-white border border-primary p-0.5 rounded-full"
-              style={{ background: 'white' }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
+            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+              <Hammer size={20} className="text-secondary" />
+            </div>
             <span className="ml-2 text-xl font-bold text-primary">Constru+</span>
           </div>
         </Link>
@@ -37,9 +32,6 @@ export default function Navbar() {
           <Link to="/products" className="font-medium hover:text-primary">Produtos</Link>
           <Link to="/categories" className="font-medium hover:text-primary">Categorias</Link>
           <Link to="/support" className="font-medium hover:text-primary">Suporte</Link>
-          {isAuthenticated && user?.tipo_usuario === 'fornecedor' && (
-            <Link to="/supplier/dashboard" className="font-medium hover:text-primary">Painel do Fornecedor</Link>
-          )}
         </nav>
 
         {/* Search & Actions */}
@@ -89,9 +81,6 @@ export default function Navbar() {
             <Link to="/products" className="block py-2 hover:text-primary" onClick={toggleMenu}>Produtos</Link>
             <Link to="/categories" className="block py-2 hover:text-primary" onClick={toggleMenu}>Categorias</Link>
             <Link to="/support" className="block py-2 hover:text-primary" onClick={toggleMenu}>Suporte</Link>
-            {isAuthenticated && user?.tipo_usuario === 'fornecedor' && (
-              <Link to="/supplier/dashboard" className="block py-2 hover:text-primary" onClick={toggleMenu}>Painel do Fornecedor</Link>
-            )}
           </div>
         </div>
       )}

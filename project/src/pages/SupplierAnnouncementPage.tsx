@@ -31,13 +31,11 @@ function CreateAnnouncementModal({
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    // Troca vírgula por ponto no preço
-    const precoFormatado = preco.replace(',', '.');
-    if (!precoFormatado || !estoque || !enderecoId) {
+    if (!preco || !estoque || !enderecoId) {
       setError('Preencha todos os campos obrigatórios.');
       return;
     }
-    if (Number(precoFormatado) <= 0 || Number(estoque) < 0) {
+    if (Number(preco) <= 0 || Number(estoque) < 0) {
       setError('Preço deve ser maior que zero e estoque não pode ser negativo.');
       return;
     }
@@ -49,15 +47,14 @@ function CreateAnnouncementModal({
         body: JSON.stringify({
           produto_id: produto.id,
           fornecedor_id: fornecedorId,
-          preco: Number(precoFormatado),
+          preco: Number(preco),
           estoque: Number(estoque),
           endereco_id: enderecoId
         })
       });
       if (!res.ok) {
-        let data = {};
-        try { data = await res.json(); } catch {}
-        setError((data as any).error || 'Erro ao criar anúncio');
+        const data = await res.json();
+        setError(data.error || 'Erro ao criar anúncio');
         setLoading(false);
         return;
       }
