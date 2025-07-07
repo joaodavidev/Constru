@@ -125,23 +125,42 @@ app.delete('/enderecos/:id', async (req, res) => {
 
 // Rotas para ofertas (anúncios do fornecedor)
 app.get('/ofertas', async (req, res) => {
-  const { fornecedor_id } = req.query;
-  if (!fornecedor_id) return res.status(400).json({ error: 'fornecedor_id é obrigatório' });
+  const { fornecedor_id, produto_id } = req.query;
   try {
-    const result = await pool.query(
-      `SELECT o.*, p.nome as produto_nome, p.imagem, e.nome_endereco FROM ofertas o
-       JOIN produtos p ON o.produto_id = p.id
-       JOIN enderecos e ON o.endereco_id = e.id
-       WHERE o.fornecedor_id = $1`,
-      [fornecedor_id]
-    );
-    res.json(result.rows);
+    let rows = [];
+    if (fornecedor_id) {
+      [rows] = await pool.query(
+        `SELECT o.*, p.nome as produto_nome, p.imagem, e.nome_endereco FROM ofertas o
+         JOIN produtos p ON o.produto_id = p.id
+         JOIN enderecos e ON o.endereco_id = e.id
+         WHERE o.fornecedor_id = ?`,
+        [fornecedor_id]
+      );
+    } else if (produto_id) {
+      [rows] = await pool.query(
+        `SELECT o.*, p.nome as produto_nome, p.imagem, e.nome_endereco FROM ofertas o
+         JOIN produtos p ON o.produto_id = p.id
+         JOIN enderecos e ON o.endereco_id = e.id
+         WHERE o.produto_id = ?`,
+        [produto_id]
+      );
+    } else {
+      return res.status(400).json({ error: 'fornecedor_id ou produto_id é obrigatório' });
+    }
+    // Garante que preco seja número
+    const ofertas = rows.map(oferta => ({
+      ...oferta,
+      preco: Number(oferta.preco)
+    }));
+    res.json(ofertas);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar ofertas' });
   }
 });
 
-app.post('/ofertas', async (req, res) => {
+app.post('/ofertas', async (req, res, next) => {
+  // Log explícito do corpo recebido
+  console.log('POST /ofertas - req.body:', req.body);
   const { produto_id, fornecedor_id, preco, estoque, endereco_id } = req.body;
   if (!produto_id || !fornecedor_id || !preco || !endereco_id || estoque === undefined) {
     return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
@@ -159,7 +178,8 @@ app.post('/ofertas', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: 'Erro ao criar oferta' });
+    console.error('Erro ao criar oferta:', err); // <-- Adiciona log detalhado
+    next(err); // Propaga para o middleware global de erro
   }
 });
 
@@ -540,6 +560,12 @@ app.put('/chat-pedido/:chat_id/notificacoes/:destinatario_id', async (req, res) 
   } catch (err) {
     res.status(500).json({ error: 'Erro ao atualizar notificações' });
   }
+});
+
+// Middleware global de tratamento de erros
+app.use((err, req, res, next) => {
+  console.error('Erro global:', err);
+  res.status(500).json({ error: 'Erro interno do servidor', details: err.message });
 });
 
 app.listen(3001, () => {
