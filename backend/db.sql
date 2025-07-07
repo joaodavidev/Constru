@@ -1,17 +1,17 @@
-CREATE TABLE IF NOT EXISTS usuarios (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE usuarios (
+  id SERIAL PRIMARY KEY,
   nome VARCHAR(100) NOT NULL,
   email VARCHAR(100) UNIQUE NOT NULL,
   senha VARCHAR(255) NOT NULL,
-  tipo_usuario VARCHAR(20) NOT NULL,
+  tipo_usuario VARCHAR(20) NOT NULL CHECK (tipo_usuario IN ('cliente', 'fornecedor', 'admin')),
   cpf CHAR(11),
   cnpj CHAR(18),
   criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS enderecos (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  usuario_id INT,
+CREATE TABLE enderecos (
+  id SERIAL PRIMARY KEY,
+  usuario_id INT REFERENCES usuarios(id) ON DELETE CASCADE,
   nome_endereco VARCHAR(50) NOT NULL,
   rua VARCHAR(100),
   numero VARCHAR(10),
@@ -20,149 +20,125 @@ CREATE TABLE IF NOT EXISTS enderecos (
   cidade VARCHAR(50),
   estado CHAR(2),
   cep CHAR(9),
-  UNIQUE KEY (usuario_id, nome_endereco),
-  FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+  UNIQUE (usuario_id, nome_endereco)
 );
 
-CREATE TABLE IF NOT EXISTS categorias (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE categorias (
+  id SERIAL PRIMARY KEY,
   nome VARCHAR(50) UNIQUE NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS produtos (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE produtos (
+  id SERIAL PRIMARY KEY,
   nome VARCHAR(100) NOT NULL,
   descricao TEXT,
-  categoria_id INT,
-  imagem VARCHAR(255),
-  FOREIGN KEY (categoria_id) REFERENCES categorias(id)
+  categoria_id INT REFERENCES categorias(id),
+  imagem VARCHAR(255)
 );
 
-CREATE TABLE IF NOT EXISTS ofertas (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  produto_id INT NOT NULL,
-  fornecedor_id INT NOT NULL,
-  preco DECIMAL(10, 2) NOT NULL,
-  estoque INT NOT NULL,
-  endereco_id INT NOT NULL,
-  UNIQUE KEY (produto_id, fornecedor_id),
-  FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE CASCADE,
-  FOREIGN KEY (fornecedor_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-  FOREIGN KEY (endereco_id) REFERENCES enderecos(id)
+CREATE TABLE ofertas (
+  id SERIAL PRIMARY KEY,
+  produto_id INT NOT NULL REFERENCES produtos(id) ON DELETE CASCADE,
+  fornecedor_id INT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  preco DECIMAL(10, 2) NOT NULL CHECK (preco > 0),
+  estoque INT NOT NULL CHECK (estoque >= 0),
+  endereco_id INT NOT NULL REFERENCES enderecos(id),
+  UNIQUE (produto_id, fornecedor_id)
 );
 
-CREATE TABLE IF NOT EXISTS pedidos (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  cliente_id INT,
+CREATE TABLE pedidos (
+  id SERIAL PRIMARY KEY,
+  cliente_id INT REFERENCES usuarios(id),
   data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  status_pagamento VARCHAR(20),
-  valor_total DECIMAL(10, 2),
-  FOREIGN KEY (cliente_id) REFERENCES usuarios(id)
+  status_pagamento VARCHAR(20) CHECK (status_pagamento IN ('pendente', 'pago', 'cancelado')),
+  valor_total DECIMAL(10, 2)
 );
 
-CREATE TABLE IF NOT EXISTS itens_pedido (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  pedido_id INT,
-  oferta_id INT,
+CREATE TABLE itens_pedido (
+  id SERIAL PRIMARY KEY,
+  pedido_id INT REFERENCES pedidos(id) ON DELETE CASCADE,
+  oferta_id INT REFERENCES ofertas(id),
   quantidade INT NOT NULL,
-  preco_unitario DECIMAL(10, 2) NOT NULL,
-  FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
-  FOREIGN KEY (oferta_id) REFERENCES ofertas(id)
+  preco_unitario DECIMAL(10, 2) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS avaliacoes (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  usuario_id INT,
-  produto_id INT,
-  nota INT,
+CREATE TABLE avaliacoes (
+  id SERIAL PRIMARY KEY,
+  usuario_id INT REFERENCES usuarios(id),
+  produto_id INT REFERENCES produtos(id),
+  nota INT CHECK (nota BETWEEN 1 AND 5),
   comentario TEXT,
-  data_avaliacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-  FOREIGN KEY (produto_id) REFERENCES produtos(id)
+  data_avaliacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS favoritos (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  usuario_id INT,
-  produto_id INT,
-  UNIQUE KEY (usuario_id, produto_id),
-  FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-  FOREIGN KEY (produto_id) REFERENCES produtos(id)
+CREATE TABLE favoritos (
+  id SERIAL PRIMARY KEY,
+  usuario_id INT REFERENCES usuarios(id),
+  produto_id INT REFERENCES produtos(id),
+  UNIQUE (usuario_id, produto_id)
 );
 
-CREATE TABLE IF NOT EXISTS historico_visualizacao (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  usuario_id INT,
-  produto_id INT,
-  data_visualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-  FOREIGN KEY (produto_id) REFERENCES produtos(id)
+CREATE TABLE historico_visualizacao (
+  id SERIAL PRIMARY KEY,
+  usuario_id INT REFERENCES usuarios(id),
+  produto_id INT REFERENCES produtos(id),
+  data_visualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS suporte_tickets (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  usuario_id INT,
-  status VARCHAR(20) DEFAULT 'aberto',
-  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+CREATE TABLE suporte_tickets (
+  id SERIAL PRIMARY KEY,
+  usuario_id INT REFERENCES usuarios(id),
+  status VARCHAR(20) DEFAULT 'aberto' CHECK (status IN ('aberto', 'respondido', 'encerrado')),
+  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS suporte_mensagens (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ticket_id INT,
-  remetente_id INT,
+CREATE TABLE suporte_mensagens (
+  id SERIAL PRIMARY KEY,
+  ticket_id INT REFERENCES suporte_tickets(id) ON DELETE CASCADE,
+  remetente_id INT REFERENCES usuarios(id),
   mensagem TEXT NOT NULL,
-  enviada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (ticket_id) REFERENCES suporte_tickets(id) ON DELETE CASCADE,
-  FOREIGN KEY (remetente_id) REFERENCES usuarios(id)
+  enviada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Carrinho de compras persistente
 CREATE TABLE IF NOT EXISTS carrinhos (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  usuario_id INT,
-  token VARCHAR(100),
+  id SERIAL PRIMARY KEY,
+  usuario_id INT REFERENCES usuarios(id), -- pode ser NULL para anônimo
+  token VARCHAR(100), -- identificador para carrinho anônimo
   criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+  atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS itens_carrinho (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  carrinho_id INT,
-  oferta_id INT,
-  quantidade INT NOT NULL,
-  preco_unitario DECIMAL(10,2) NOT NULL,
-  FOREIGN KEY (carrinho_id) REFERENCES carrinhos(id) ON DELETE CASCADE,
-  FOREIGN KEY (oferta_id) REFERENCES ofertas(id)
+  id SERIAL PRIMARY KEY,
+  carrinho_id INT REFERENCES carrinhos(id) ON DELETE CASCADE,
+  oferta_id INT REFERENCES ofertas(id),
+  quantidade INT NOT NULL CHECK (quantidade > 0),
+  preco_unitario DECIMAL(10,2) NOT NULL
 );
 
+-- Chat pós-compra entre cliente e fornecedor por pedido
 CREATE TABLE IF NOT EXISTS chats_pedido (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  pedido_id INT,
-  cliente_id INT,
-  fornecedor_id INT,
-  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
-  FOREIGN KEY (cliente_id) REFERENCES usuarios(id),
-  FOREIGN KEY (fornecedor_id) REFERENCES usuarios(id)
+  id SERIAL PRIMARY KEY,
+  pedido_id INT REFERENCES pedidos(id) ON DELETE CASCADE,
+  cliente_id INT REFERENCES usuarios(id),
+  fornecedor_id INT REFERENCES usuarios(id),
+  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS mensagens_chat_pedido (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  chat_id INT,
-  remetente_id INT,
+  id SERIAL PRIMARY KEY,
+  chat_id INT REFERENCES chats_pedido(id) ON DELETE CASCADE,
+  remetente_id INT REFERENCES usuarios(id),
   mensagem TEXT NOT NULL,
-  lida TINYINT(1) DEFAULT 0,
-  enviada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (chat_id) REFERENCES chats_pedido(id) ON DELETE CASCADE,
-  FOREIGN KEY (remetente_id) REFERENCES usuarios(id)
+  lida BOOLEAN DEFAULT FALSE,
+  enviada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Notificações de mensagens não lidas por chat
 CREATE TABLE IF NOT EXISTS notificacoes_chat_pedido (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  chat_id INT,
-  destinatario_id INT,
-  quantidade INT DEFAULT 0,
-  FOREIGN KEY (chat_id) REFERENCES chats_pedido(id) ON DELETE CASCADE,
-  FOREIGN KEY (destinatario_id) REFERENCES usuarios(id)
+  id SERIAL PRIMARY KEY,
+  chat_id INT REFERENCES chats_pedido(id) ON DELETE CASCADE,
+  destinatario_id INT REFERENCES usuarios(id),
+  quantidade INT DEFAULT 0
 );

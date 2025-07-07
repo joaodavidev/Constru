@@ -12,7 +12,6 @@ import SupplierSignupPage from './pages/SupplierSignupPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SupplierAnnouncementPage from './pages/SupplierAnnouncementPage';
 import SupportPage from './pages/SupportPage';
-import ProfilePage from './pages/ProfilePage';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedSupplierRoute from './components/ProtectedSupplierRoute';
@@ -37,7 +36,6 @@ function App() {
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/support" element={<SupportPage />} />
                 <Route path="/supplier/signup" element={<SupplierSignupPage />} />
-                <Route path="/account" element={<ProfilePage />} />
                 <Route path="/supplier/dashboard" element={
                   <ProtectedSupplierRoute>
                     <SupplierAnnouncementPage />

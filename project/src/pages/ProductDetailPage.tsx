@@ -5,7 +5,6 @@ import { getProductById, getProductsByCategory } from '../data/products';
 import { useCart } from '../context/CartContext';
 import { Oferta } from '../types/supplier';
 import { toast } from 'react-toastify';
-import { API_BASE_URL } from '../api';
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,7 +23,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!id) return;
     setLoadingOfertas(true);
-    fetch(`${API_BASE_URL}/ofertas?produto_id=${id}`)
+    fetch(`http://localhost:3001/ofertas?produto_id=${id}`)
       .then(res => res.json())
       .then(data => setOfertas(Array.isArray(data) ? data : []))
       .catch(() => setOfertas([]))
@@ -34,7 +33,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!id) return;
     setLoadingAvaliacoes(true);
-    fetch(`${API_BASE_URL}/avaliacoes?produto_id=${id}`)
+    fetch(`http://localhost:3001/avaliacoes?produto_id=${id}`)
       .then(res => res.json())
       .then(data => setAvaliacoes(Array.isArray(data) ? data : []))
       .catch(() => setAvaliacoes([]))
@@ -245,27 +244,7 @@ export default function ProductDetailPage() {
                     <span className="ml-2 text-sm text-gray-500">{supplier.rating.toFixed(1)}</span>
                   )}
                 </div>
-                {usandoOfertasReais ? (
-                  <button
-                    className="btn btn-primary flex items-center gap-2"
-                    disabled={addingId === supplier.id}
-                    onClick={async () => {
-                      setAddingId(supplier.id);
-                      const oferta = ofertas.find(o => o.id === supplier.id);
-                      if (oferta) {
-                        await addToCart(oferta, 1);
-                        toast.success('Produto adicionado ao carrinho!');
-                      }
-                      setAddingId(null);
-                    }}
-                  >
-                    <ShoppingCart size={18} /> Adicionar ao carrinho
-                  </button>
-                ) : (
-                  <button className="btn btn-primary flex items-center gap-2" disabled>
-                    <ShoppingCart size={18} /> Adicionar ao carrinho
-                  </button>
-                )}
+                <button className="btn btn-primary">Entrar em contato</button>
               </div>
               {/* Avaliações reais ou mocks */}
               {supplier.reviews && supplier.reviews.length > 0 ? (
@@ -311,7 +290,7 @@ export default function ProductDetailPage() {
                       try {
                         // TODO: pegar usuario_id real do contexto de auth
                         const usuario_id = localStorage.getItem('userId') || 1;
-                        const res = await fetch(`${API_BASE_URL}/avaliacoes`, {
+                        const res = await fetch('http://localhost:3001/avaliacoes', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
