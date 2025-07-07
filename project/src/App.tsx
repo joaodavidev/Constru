@@ -8,6 +8,7 @@ import ProductDetailPage from './pages/ProductDetailPage';
 import CartPage from './pages/CartPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import ProfilePage from './pages/ProfilePage';
 import SupplierSignupPage from './pages/SupplierSignupPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SupplierAnnouncementPage from './pages/SupplierAnnouncementPage';
@@ -34,6 +35,7 @@ function App() {
                 <Route path="/cart" element={<CartPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/support" element={<SupportPage />} />
                 <Route path="/supplier/signup" element={<SupplierSignupPage />} />
                 <Route path="/supplier/dashboard" element={
@@ -52,4 +54,4 @@ function App() {
   );
 }
 
-export default App
+export default App;

@@ -31,6 +31,9 @@ export default function Navbar() {
           <Link to="/" className="font-medium hover:text-primary">Início</Link>
           <Link to="/products" className="font-medium hover:text-primary">Produtos</Link>
           <Link to="/categories" className="font-medium hover:text-primary">Categorias</Link>
+          {isAuthenticated && user?.tipo_usuario === 'fornecedor' && (
+            <Link to="/supplier/dashboard" className="font-medium text-primary font-semibold hover:underline">Painel do Fornecedor</Link>
+          )}
           <Link to="/support" className="font-medium hover:text-primary">Suporte</Link>
         </nav>
 
@@ -56,12 +59,34 @@ export default function Navbar() {
             )}
           </Link>
           <Link 
-            to={isAuthenticated ? "/account" : "/login"}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            aria-label={isAuthenticated ? "Conta" : "Entrar"}
+            to={isAuthenticated ? "/profile" : "/login"}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors group relative"
+            aria-label={isAuthenticated ? "Perfil" : "Entrar"}
           >
-            <User size={20} />
+            <User size={20} className={isAuthenticated ? "text-primary" : ""} />
+            {isAuthenticated && (
+              <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-md shadow-lg py-1 hidden group-hover:block">
+                <div className="px-4 py-2 text-sm text-gray-700 border-b">
+                  {user?.name}
+                </div>
+                <Link 
+                  to="/profile" 
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Meu Perfil
+                </Link>
+                {user?.tipo_usuario === 'fornecedor' && (
+                  <Link 
+                    to="/supplier/dashboard" 
+                    className="block px-4 py-2 text-sm text-primary font-semibold hover:bg-gray-100"
+                  >
+                    Painel do Fornecedor
+                  </Link>
+                )}
+              </div>
+            )}
           </Link>
+          
           {/* Mobile Menu Button */}
           <button 
             className="md:hidden p-2 hover:bg-gray-100 rounded-full transition-colors"

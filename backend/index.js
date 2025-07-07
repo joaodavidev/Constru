@@ -77,8 +77,8 @@ app.get('/enderecos', async (req, res) => {
   const { usuario_id } = req.query;
   if (!usuario_id) return res.status(400).json({ error: 'usuario_id é obrigatório' });
   try {
-    const result = await pool.query('SELECT * FROM enderecos WHERE usuario_id = $1', [usuario_id]);
-    res.json(result.rows);
+    const [rows] = await pool.query('SELECT * FROM enderecos WHERE usuario_id = ?', [usuario_id]);
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar endereços' });
   }
@@ -137,14 +137,14 @@ app.get('/ofertas', async (req, res) => {
   const { fornecedor_id } = req.query;
   if (!fornecedor_id) return res.status(400).json({ error: 'fornecedor_id é obrigatório' });
   try {
-    const result = await pool.query(
-      `SELECT o.*, p.nome as produto_nome, p.imagem, e.nome_endereco FROM ofertas o
+    const [rows] = await pool.query(
+      `SELECT o.*, p.nome as produto_nome, p.imagem as produto_imagem, e.nome_endereco FROM ofertas o
        JOIN produtos p ON o.produto_id = p.id
        JOIN enderecos e ON o.endereco_id = e.id
-       WHERE o.fornecedor_id = $1`,
+       WHERE o.fornecedor_id = ?`,
       [fornecedor_id]
     );
-    res.json(result.rows);
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar ofertas' });
   }
@@ -548,6 +548,56 @@ app.put('/chat-pedido/:chat_id/notificacoes/:destinatario_id', async (req, res) 
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao atualizar notificações' });
+  }
+});
+
+// Rota para atualizar dados do usuário
+app.put('/usuarios/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nome, email, senha_atual, nova_senha } = req.body;
+  
+  try {
+    // Primeiro verifica se a senha atual está correta
+    const [user] = await pool.query('SELECT * FROM usuarios WHERE id = ?', [id]);
+    if (!user[0]) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+    
+    if (senha_atual && nova_senha) {
+      // Se estiver alterando a senha, verifica a senha atual
+      if (user[0].senha !== senha_atual) {
+        return res.status(401).json({ error: 'Senha atual incorreta' });
+      }
+    }
+
+    // Verifica se o novo email já está em uso
+    if (email && email !== user[0].email) {
+      const [emailExists] = await pool.query('SELECT 1 FROM usuarios WHERE email = ? AND id != ?', [email, id]);
+      if (emailExists.length > 0) {
+        return res.status(409).json({ error: 'Este email já está em uso' });
+      }
+    }
+
+    // Monta o objeto de atualização
+    const updates = {};
+    if (nome) updates.nome = nome;
+    if (email) updates.email = email;
+    if (nova_senha) updates.senha = nova_senha;
+
+    // Atualiza os dados
+    const updateQuery = 'UPDATE usuarios SET ? WHERE id = ?';
+    await pool.query(updateQuery, [updates, id]);
+
+    // Retorna os dados atualizados
+    const [updatedUser] = await pool.query(
+      'SELECT id, nome, email, tipo_usuario, cnpj FROM usuarios WHERE id = ?',
+      [id]
+    );
+
+    res.json({ user: updatedUser[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar usuário' });
   }
 });
 

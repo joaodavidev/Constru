@@ -156,7 +156,7 @@ export default function SupplierAnnouncementPage() {
   const { user } = useAuth();
   const fornecedorId = user?.id ?? '';
   const { ofertas, loading: ofertasLoading, error: ofertasError, setOfertas } = useSupplierOfertas(fornecedorId);
-  const { enderecos, setEnderecos } = useSupplierEnderecos(fornecedorId);
+  const { enderecos, setEnderecos, error: enderecosError } = useSupplierEnderecos(fornecedorId);
   const [modalProduto, setModalProduto] = useState<any | null>(null);
 
   const handleEnderecoCreated = (novo: Endereco) => {
@@ -244,6 +244,16 @@ export default function SupplierAnnouncementPage() {
   return (
     <div className="container py-12">
       <h1 className="text-3xl font-semibold mb-6">Painel do Fornecedor</h1>
+      {/* Exibe erros críticos de carregamento */}
+      {!fornecedorId && (
+        <div className="bg-red-100 text-red-700 p-4 rounded mb-4">ID do fornecedor não encontrado. Faça login novamente.</div>
+      )}
+      {ofertasError && (
+        <div className="bg-red-100 text-red-700 p-4 rounded mb-4">Erro ao carregar anúncios: {ofertasError}</div>
+      )}
+      {enderecosError && (
+        <div className="bg-red-100 text-red-700 p-4 rounded mb-4">Erro ao carregar endereços: {enderecosError}</div>
+      )}
       <SupplierAddressesManager
         enderecos={enderecos}
         onEnderecoCreated={handleEnderecoCreated}
