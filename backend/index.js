@@ -1,6 +1,13 @@
 const express = require('express');
+const cors = require('cors');
 const app = express();
 const pool = require('./db');
+
+// Habilita CORS para o frontend
+app.use(cors({
+  origin: 'http://localhost:5173', // ajuste se necessário
+  credentials: true
+}));
 
 app.use(express.json());
 
@@ -21,8 +28,8 @@ app.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Email e senha são obrigatórios' });
   }
   try {
-    const result = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
-    const user = result.rows[0];
+    const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email]);
+    const user = rows[0];
     if (!user) {
       return res.status(401).json({ error: 'Usuário não encontrado' });
     }
@@ -47,16 +54,18 @@ app.post('/usuarios', async (req, res) => {
   }
   try {
     // Verifica se o email já existe
-    const exists = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
-    if (exists.rows.length > 0) {
+    const [exists] = await pool.query('SELECT id FROM usuarios WHERE email = ?', [email]);
+    if (exists.length > 0) {
       return res.status(409).json({ error: 'E-mail já cadastrado' });
     }
     // Insere usuário
-    const result = await pool.query(
-      'INSERT INTO usuarios (nome, email, senha, tipo_usuario, cnpj) VALUES ($1, $2, $3, $4, $5) RETURNING id, nome, email, tipo_usuario, cnpj',
+    const [result] = await pool.query(
+      'INSERT INTO usuarios (nome, email, senha, tipo_usuario, cnpj) VALUES (?, ?, ?, ?, ?)',
       [nome, email, senha, tipo_usuario, cnpj || null]
     );
-    res.status(201).json({ user: result.rows[0] });
+    // Busca o usuário recém-criado
+    const [userRows] = await pool.query('SELECT id, nome, email, tipo_usuario, cnpj FROM usuarios WHERE id = ?', [result.insertId]);
+    res.status(201).json({ user: userRows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao cadastrar usuário' });
