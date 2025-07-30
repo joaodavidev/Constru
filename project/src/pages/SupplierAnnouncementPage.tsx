@@ -292,7 +292,7 @@ export default function SupplierAnnouncementPage() {
                 <div className="flex-1">
                   <img src={oferta.produto_imagem || ''} alt={oferta.produto_nome} className="w-full h-32 object-cover rounded mb-2" />
                   <h3 className="font-semibold">{oferta.produto_nome}</h3>
-                  <p className="text-sm text-gray-600">Preço: R$ {oferta.preco.toFixed(2)}</p>
+                  <p className="text-sm text-gray-600">Preço: R$ {Number(oferta.preco).toFixed(2)}</p>
                   <p className="text-sm text-gray-600">Estoque: {oferta.estoque}</p>
                   <p className="text-sm text-gray-600">Endereço: {oferta.nome_endereco}</p>
                 </div>
