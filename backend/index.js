@@ -88,13 +88,15 @@ app.post('/enderecos', async (req, res) => {
   const { usuario_id, nome_endereco, rua, numero, complemento, bairro, cidade, estado, cep } = req.body;
   if (!usuario_id || !nome_endereco) return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
   try {
-    const exists = await pool.query('SELECT 1 FROM enderecos WHERE usuario_id = $1 AND nome_endereco = $2', [usuario_id, nome_endereco]);
-    if (exists.rows.length > 0) return res.status(409).json({ error: 'Apelido de endereço já cadastrado' });
-    const result = await pool.query(
-      'INSERT INTO enderecos (usuario_id, nome_endereco, rua, numero, complemento, bairro, cidade, estado, cep) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
+    const [exists] = await pool.query('SELECT 1 FROM enderecos WHERE usuario_id = ? AND nome_endereco = ?', [usuario_id, nome_endereco]);
+    if (exists.length > 0) return res.status(409).json({ error: 'Apelido de endereço já cadastrado' });
+    const [result] = await pool.query(
+      'INSERT INTO enderecos (usuario_id, nome_endereco, rua, numero, complemento, bairro, cidade, estado, cep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [usuario_id, nome_endereco, rua, numero, complemento, bairro, cidade, estado, cep]
     );
-    res.status(201).json(result.rows[0]);
+    // Busca o endereço recém-criado
+    const [rows] = await pool.query('SELECT * FROM enderecos WHERE id = ?', [result.insertId]);
+    res.status(201).json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao cadastrar endereço' });
   }
