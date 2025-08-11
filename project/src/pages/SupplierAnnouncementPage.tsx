@@ -45,11 +45,11 @@ function CreateAnnouncementModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          produto_id: produto.id,
-          fornecedor_id: fornecedorId,
+          produto_id: Number(produto.id),
+          fornecedor_id: Number(fornecedorId),
           preco: Number(preco),
           estoque: Number(estoque),
-          endereco_id: enderecoId
+          endereco_id: Number(enderecoId)
         })
       });
       if (!res.ok) {

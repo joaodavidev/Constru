@@ -162,14 +162,23 @@ app.post('/ofertas', async (req, res) => {
   }
   try {
     // Garante que não existe oferta duplicada
-    const exists = await pool.query('SELECT 1 FROM ofertas WHERE produto_id = $1 AND fornecedor_id = $2', [produto_id, fornecedor_id]);
-    if (exists.rows.length > 0) return res.status(409).json({ error: 'Você já possui um anúncio para este produto' });
-    const result = await pool.query(
-      'INSERT INTO ofertas (produto_id, fornecedor_id, preco, estoque, endereco_id) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+    const [exists] = await pool.query('SELECT 1 FROM ofertas WHERE produto_id = ? AND fornecedor_id = ?', [produto_id, fornecedor_id]);
+    if (exists.length > 0) return res.status(409).json({ error: 'Você já possui um anúncio para este produto' });
+    const [result] = await pool.query(
+      'INSERT INTO ofertas (produto_id, fornecedor_id, preco, estoque, endereco_id) VALUES (?, ?, ?, ?, ?)',
       [produto_id, fornecedor_id, preco, estoque, endereco_id]
     );
-    res.status(201).json(result.rows[0]);
+    // Busca o anúncio recém-criado para retornar os dados completos
+    const [ofertaRows] = await pool.query(
+      `SELECT o.*, p.nome as produto_nome, p.imagem as produto_imagem, e.nome_endereco FROM ofertas o
+       JOIN produtos p ON o.produto_id = p.id
+       JOIN enderecos e ON o.endereco_id = e.id
+       WHERE o.id = ?`,
+      [result.insertId]
+    );
+    res.status(201).json(ofertaRows[0]);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erro ao criar oferta' });
   }
 });
