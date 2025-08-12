@@ -1,11 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
+const dotenv = require('dotenv');
+dotenv.config();
 const app = express();
 const pool = require('./db');
 
 // Habilita CORS para o frontend
 app.use(cors({
-  origin: 'http://localhost:5173', // ajuste se necessário
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
 
@@ -33,8 +36,9 @@ app.post('/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({ error: 'Usuário não encontrado' });
     }
-    // Comparação simples de senha (em produção, use hash)
-    if (user.senha !== senha) {
+    // Comparação segura de senha
+    const senhaCorreta = await bcrypt.compare(senha, user.senha);
+    if (!senhaCorreta) {
       return res.status(401).json({ error: 'Senha incorreta' });
     }
     // Remover senha do retorno
@@ -58,10 +62,12 @@ app.post('/usuarios', async (req, res) => {
     if (exists.length > 0) {
       return res.status(409).json({ error: 'E-mail já cadastrado' });
     }
+    // Hash da senha
+    const hash = await bcrypt.hash(senha, 10);
     // Insere usuário
     const [result] = await pool.query(
       'INSERT INTO usuarios (nome, email, senha, tipo_usuario, cnpj) VALUES (?, ?, ?, ?, ?)',
-      [nome, email, senha, tipo_usuario, cnpj || null]
+      [nome, email, hash, tipo_usuario, cnpj || null]
     );
     // Busca o usuário recém-criado
     const [userRows] = await pool.query('SELECT id, nome, email, tipo_usuario, cnpj FROM usuarios WHERE id = ?', [result.insertId]);
@@ -108,7 +114,7 @@ app.put('/enderecos/:id', async (req, res) => {
   if (!nome_endereco) return res.status(400).json({ error: 'nome_endereco é obrigatório' });
   try {
     await pool.query(
-      'UPDATE enderecos SET nome_endereco=$1, rua=$2, numero=$3, complemento=$4, bairro=$5, cidade=$6, estado=$7, cep=$8 WHERE id=$9',
+      'UPDATE enderecos SET nome_endereco=?, rua=?, numero=?, complemento=?, bairro=?, cidade=?, estado=?, cep=? WHERE id=?',
       [nome_endereco, rua, numero, complemento, bairro, cidade, estado, cep, id]
     );
     res.json({ success: true });
@@ -121,13 +127,13 @@ app.delete('/enderecos/:id', async (req, res) => {
   const { id } = req.params;
   try {
     // Verifica se existe oferta vinculada
-    const vinculo = await pool.query('SELECT 1 FROM ofertas WHERE endereco_id = $1', [id]);
-    if (vinculo.rows.length > 0) {
+    const [vinculo] = await pool.query('SELECT 1 FROM ofertas WHERE endereco_id = ?', [id]);
+    if (vinculo.length > 0) {
       // Busca produtos vinculados
-      const produtos = await pool.query('SELECT p.id, p.nome FROM ofertas o JOIN produtos p ON o.produto_id = p.id WHERE o.endereco_id = $1', [id]);
-      return res.status(409).json({ error: 'Este endereço está vinculado aos seguintes anúncios e não pode ser removido.', produtos: produtos.rows });
+      const [produtos] = await pool.query('SELECT p.id, p.nome FROM ofertas o JOIN produtos p ON o.produto_id = p.id WHERE o.endereco_id = ?', [id]);
+      return res.status(409).json({ error: 'Este endereço está vinculado aos seguintes anúncios e não pode ser removido.', produtos });
     }
-    await pool.query('DELETE FROM enderecos WHERE id = $1', [id]);
+    await pool.query('DELETE FROM enderecos WHERE id = ?', [id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao remover endereço' });
@@ -168,17 +174,10 @@ app.post('/ofertas', async (req, res) => {
       'INSERT INTO ofertas (produto_id, fornecedor_id, preco, estoque, endereco_id) VALUES (?, ?, ?, ?, ?)',
       [produto_id, fornecedor_id, preco, estoque, endereco_id]
     );
-    // Busca o anúncio recém-criado para retornar os dados completos
-    const [ofertaRows] = await pool.query(
-      `SELECT o.*, p.nome as produto_nome, p.imagem as produto_imagem, e.nome_endereco FROM ofertas o
-       JOIN produtos p ON o.produto_id = p.id
-       JOIN enderecos e ON o.endereco_id = e.id
-       WHERE o.id = ?`,
-      [result.insertId]
-    );
-    res.status(201).json(ofertaRows[0]);
+    // Busca o anúncio recém-criado
+    const [rows] = await pool.query('SELECT * FROM ofertas WHERE id = ?', [result.insertId]);
+    res.status(201).json(rows[0]);
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: 'Erro ao criar oferta' });
   }
 });
@@ -194,7 +193,7 @@ app.put('/ofertas/:id', async (req, res) => {
   }
   try {
     await pool.query(
-      'UPDATE ofertas SET preco=$1, estoque=$2, endereco_id=$3 WHERE id=$4',
+      'UPDATE ofertas SET preco=?, estoque=?, endereco_id=? WHERE id=?',
       [preco, estoque, endereco_id, id]
     );
     res.json({ success: true });
@@ -206,7 +205,7 @@ app.put('/ofertas/:id', async (req, res) => {
 app.delete('/ofertas/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    await pool.query('DELETE FROM ofertas WHERE id = $1', [id]);
+    await pool.query('DELETE FROM ofertas WHERE id = ?', [id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao remover oferta' });
@@ -219,23 +218,25 @@ app.get('/avaliacoes', async (req, res) => {
   try {
     let result;
     if (produto_id) {
-      result = await pool.query(
+      const [rows] = await pool.query(
         `SELECT a.*, u.nome as usuario_nome FROM avaliacoes a
          JOIN usuarios u ON a.usuario_id = u.id
-         WHERE a.produto_id = $1
+         WHERE a.produto_id = ?
          ORDER BY a.data_avaliacao DESC`,
         [produto_id]
       );
+      result = { rows };
     } else if (fornecedor_id) {
       // Busca avaliações de todos os produtos de um fornecedor
-      result = await pool.query(
+      const [rows] = await pool.query(
         `SELECT a.*, u.nome as usuario_nome FROM avaliacoes a
          JOIN usuarios u ON a.usuario_id = u.id
          JOIN ofertas o ON a.produto_id = o.produto_id
-         WHERE o.fornecedor_id = $1
+         WHERE o.fornecedor_id = ?
          ORDER BY a.data_avaliacao DESC`,
         [fornecedor_id]
       );
+      result = { rows };
     } else {
       return res.status(400).json({ error: 'produto_id ou fornecedor_id é obrigatório' });
     }
@@ -255,18 +256,20 @@ app.post('/avaliacoes', async (req, res) => {
   }
   try {
     // Opcional: impedir múltiplas avaliações do mesmo usuário para o mesmo produto
-    const exists = await pool.query(
-      'SELECT 1 FROM avaliacoes WHERE usuario_id = $1 AND produto_id = $2',
+    const [exists] = await pool.query(
+      'SELECT 1 FROM avaliacoes WHERE usuario_id = ? AND produto_id = ?',
       [usuario_id, produto_id]
     );
-    if (exists.rows.length > 0) {
+    if (exists.length > 0) {
       return res.status(409).json({ error: 'Você já avaliou este produto' });
     }
-    const result = await pool.query(
-      'INSERT INTO avaliacoes (usuario_id, produto_id, nota, comentario) VALUES ($1, $2, $3, $4) RETURNING *',
+    const [result] = await pool.query(
+      'INSERT INTO avaliacoes (usuario_id, produto_id, nota, comentario) VALUES (?, ?, ?, ?)',
       [usuario_id, produto_id, nota, comentario || null]
     );
-    res.status(201).json(result.rows[0]);
+    // Busca a avaliação recém-criada
+    const [rows] = await pool.query('SELECT * FROM avaliacoes WHERE id = ?', [result.insertId]);
+    res.status(201).json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao criar avaliação' });
   }
@@ -278,11 +281,11 @@ app.get('/suporte/tickets', async (req, res) => {
   const { usuario_id } = req.query;
   if (!usuario_id) return res.status(400).json({ error: 'usuario_id é obrigatório' });
   try {
-    const result = await pool.query(
-      'SELECT * FROM suporte_tickets WHERE usuario_id = $1 ORDER BY criado_em DESC',
+    const [rows] = await pool.query(
+      'SELECT * FROM suporte_tickets WHERE usuario_id = ? ORDER BY criado_em DESC',
       [usuario_id]
     );
-    res.json(result.rows);
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar tickets' });
   }
@@ -293,11 +296,13 @@ app.post('/suporte/tickets', async (req, res) => {
   const { usuario_id } = req.body;
   if (!usuario_id) return res.status(400).json({ error: 'usuario_id é obrigatório' });
   try {
-    const result = await pool.query(
-      'INSERT INTO suporte_tickets (usuario_id) VALUES ($1) RETURNING *',
+    const [result] = await pool.query(
+      'INSERT INTO suporte_tickets (usuario_id) VALUES (?)',
       [usuario_id]
     );
-    res.status(201).json(result.rows[0]);
+    // Busca o ticket recém-criado
+    const [rows] = await pool.query('SELECT * FROM suporte_tickets WHERE id = ?', [result.insertId]);
+    res.status(201).json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao abrir ticket' });
   }
@@ -308,13 +313,13 @@ app.get('/suporte/mensagens', async (req, res) => {
   const { ticket_id } = req.query;
   if (!ticket_id) return res.status(400).json({ error: 'ticket_id é obrigatório' });
   try {
-    const result = await pool.query(
+    const [rows] = await pool.query(
       `SELECT m.*, u.nome as remetente_nome FROM suporte_mensagens m
        JOIN usuarios u ON m.remetente_id = u.id
-       WHERE m.ticket_id = $1 ORDER BY m.enviada_em ASC`,
+       WHERE m.ticket_id = ? ORDER BY m.enviada_em ASC`,
       [ticket_id]
     );
-    res.json(result.rows);
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar mensagens' });
   }
@@ -327,11 +332,13 @@ app.post('/suporte/mensagens', async (req, res) => {
     return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
   }
   try {
-    const result = await pool.query(
-      'INSERT INTO suporte_mensagens (ticket_id, remetente_id, mensagem) VALUES ($1, $2, $3) RETURNING *',
+    const [result] = await pool.query(
+      'INSERT INTO suporte_mensagens (ticket_id, remetente_id, mensagem) VALUES (?, ?, ?)',
       [ticket_id, remetente_id, mensagem]
     );
-    res.status(201).json(result.rows[0]);
+    // Busca a mensagem recém-criada
+    const [rows] = await pool.query('SELECT * FROM suporte_mensagens WHERE id = ?', [result.insertId]);
+    res.status(201).json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao enviar mensagem' });
   }
@@ -344,7 +351,7 @@ app.put('/suporte/tickets/:id', async (req, res) => {
   if (!status) return res.status(400).json({ error: 'status é obrigatório' });
   try {
     await pool.query(
-      'UPDATE suporte_tickets SET status = $1 WHERE id = $2',
+      'UPDATE suporte_tickets SET status = ? WHERE id = ?',
       [status, id]
     );
     res.json({ success: true });
@@ -360,18 +367,20 @@ app.post('/carrinho', async (req, res) => {
   try {
     let carrinho;
     if (usuario_id) {
-      const result = await pool.query('SELECT * FROM carrinhos WHERE usuario_id = $1', [usuario_id]);
-      carrinho = result.rows[0];
+      const [rows] = await pool.query('SELECT * FROM carrinhos WHERE usuario_id = ?', [usuario_id]);
+      carrinho = rows[0];
       if (!carrinho) {
-        const novo = await pool.query('INSERT INTO carrinhos (usuario_id) VALUES ($1) RETURNING *', [usuario_id]);
-        carrinho = novo.rows[0];
+        const [result] = await pool.query('INSERT INTO carrinhos (usuario_id) VALUES (?)', [usuario_id]);
+        const [novoRows] = await pool.query('SELECT * FROM carrinhos WHERE id = ?', [result.insertId]);
+        carrinho = novoRows[0];
       }
     } else if (token) {
-      const result = await pool.query('SELECT * FROM carrinhos WHERE token = $1', [token]);
-      carrinho = result.rows[0];
+      const [rows] = await pool.query('SELECT * FROM carrinhos WHERE token = ?', [token]);
+      carrinho = rows[0];
       if (!carrinho) {
-        const novo = await pool.query('INSERT INTO carrinhos (token) VALUES ($1) RETURNING *', [token]);
-        carrinho = novo.rows[0];
+        const [result] = await pool.query('INSERT INTO carrinhos (token) VALUES (?)', [token]);
+        const [novoRows] = await pool.query('SELECT * FROM carrinhos WHERE id = ?', [result.insertId]);
+        carrinho = novoRows[0];
       }
     } else {
       return res.status(400).json({ error: 'usuario_id ou token é obrigatório' });
@@ -386,15 +395,15 @@ app.post('/carrinho', async (req, res) => {
 app.get('/carrinho/:id/itens', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await pool.query(
+    const [rows] = await pool.query(
       `SELECT ic.*, o.preco, o.estoque, p.nome as produto_nome, p.imagem
        FROM itens_carrinho ic
        JOIN ofertas o ON ic.oferta_id = o.id
        JOIN produtos p ON o.produto_id = p.id
-       WHERE ic.carrinho_id = $1`,
+       WHERE ic.carrinho_id = ?`,
       [id]
     );
-    res.json(result.rows);
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar itens do carrinho' });
   }
@@ -409,15 +418,15 @@ app.post('/carrinho/:id/item', async (req, res) => {
   }
   try {
     // Verifica se já existe o item
-    const exists = await pool.query('SELECT * FROM itens_carrinho WHERE carrinho_id = $1 AND oferta_id = $2', [id, oferta_id]);
-    if (exists.rows.length > 0) {
+    const [exists] = await pool.query('SELECT * FROM itens_carrinho WHERE carrinho_id = ? AND oferta_id = ?', [id, oferta_id]);
+    if (exists.length > 0) {
       // Atualiza quantidade
-      const novoQtd = exists.rows[0].quantidade + quantidade;
-      await pool.query('UPDATE itens_carrinho SET quantidade = $1 WHERE id = $2', [novoQtd, exists.rows[0].id]);
+      const novoQtd = exists[0].quantidade + quantidade;
+      await pool.query('UPDATE itens_carrinho SET quantidade = ? WHERE id = ?', [novoQtd, exists[0].id]);
       return res.json({ success: true, updated: true });
     }
     await pool.query(
-      'INSERT INTO itens_carrinho (carrinho_id, oferta_id, quantidade, preco_unitario) VALUES ($1, $2, $3, $4)',
+      'INSERT INTO itens_carrinho (carrinho_id, oferta_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)',
       [id, oferta_id, quantidade, preco_unitario]
     );
     res.status(201).json({ success: true });
@@ -432,7 +441,7 @@ app.put('/carrinho/item/:item_id', async (req, res) => {
   const { quantidade } = req.body;
   if (!quantidade) return res.status(400).json({ error: 'quantidade é obrigatória' });
   try {
-    await pool.query('UPDATE itens_carrinho SET quantidade = $1 WHERE id = $2', [quantidade, item_id]);
+    await pool.query('UPDATE itens_carrinho SET quantidade = ? WHERE id = ?', [quantidade, item_id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao atualizar item do carrinho' });
@@ -443,7 +452,7 @@ app.put('/carrinho/item/:item_id', async (req, res) => {
 app.delete('/carrinho/item/:item_id', async (req, res) => {
   const { item_id } = req.params;
   try {
-    await pool.query('DELETE FROM itens_carrinho WHERE id = $1', [item_id]);
+    await pool.query('DELETE FROM itens_carrinho WHERE id = ?', [item_id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao remover item do carrinho' });
@@ -456,11 +465,11 @@ app.post('/carrinho/migrar', async (req, res) => {
   if (!token || !usuario_id) return res.status(400).json({ error: 'token e usuario_id são obrigatórios' });
   try {
     // Busca carrinho anônimo
-    const result = await pool.query('SELECT * FROM carrinhos WHERE token = $1', [token]);
-    const carrinho = result.rows[0];
+    const [rows] = await pool.query('SELECT * FROM carrinhos WHERE token = ?', [token]);
+    const carrinho = rows[0];
     if (!carrinho) return res.status(404).json({ error: 'Carrinho não encontrado' });
     // Atualiza carrinho para vincular ao usuário
-    await pool.query('UPDATE carrinhos SET usuario_id = $1, token = NULL WHERE id = $2', [usuario_id, carrinho.id]);
+    await pool.query('UPDATE carrinhos SET usuario_id = ?, token = NULL WHERE id = ?', [usuario_id, carrinho.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao migrar carrinho' });
@@ -476,13 +485,14 @@ app.post('/chat-pedido', async (req, res) => {
   }
   try {
     // Garante que não existe chat duplicado
-    const exists = await pool.query('SELECT * FROM chats_pedido WHERE pedido_id = $1 AND fornecedor_id = $2', [pedido_id, fornecedor_id]);
-    if (exists.rows.length > 0) return res.json(exists.rows[0]);
-    const result = await pool.query(
-      'INSERT INTO chats_pedido (pedido_id, cliente_id, fornecedor_id) VALUES ($1, $2, $3) RETURNING *',
+    const [exists] = await pool.query('SELECT * FROM chats_pedido WHERE pedido_id = ? AND fornecedor_id = ?', [pedido_id, fornecedor_id]);
+    if (exists.length > 0) return res.json(exists[0]);
+    const [result] = await pool.query(
+      'INSERT INTO chats_pedido (pedido_id, cliente_id, fornecedor_id) VALUES (?, ?, ?)',
       [pedido_id, cliente_id, fornecedor_id]
     );
-    res.status(201).json(result.rows[0]);
+    const [novoRows] = await pool.query('SELECT * FROM chats_pedido WHERE id = ?', [result.insertId]);
+    res.status(201).json(novoRows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao criar chat do pedido' });
   }
@@ -492,13 +502,13 @@ app.post('/chat-pedido', async (req, res) => {
 app.get('/chat-pedido/:pedido_id/:fornecedor_id', async (req, res) => {
   const { pedido_id, fornecedor_id } = req.params;
   try {
-    const chat = await pool.query('SELECT * FROM chats_pedido WHERE pedido_id = $1 AND fornecedor_id = $2', [pedido_id, fornecedor_id]);
-    if (chat.rows.length === 0) return res.status(404).json({ error: 'Chat não encontrado' });
-    const mensagens = await pool.query(
-      'SELECT m.*, u.nome as remetente_nome FROM mensagens_chat_pedido m JOIN usuarios u ON m.remetente_id = u.id WHERE m.chat_id = $1 ORDER BY m.enviada_em ASC',
-      [chat.rows[0].id]
+    const [chatRows] = await pool.query('SELECT * FROM chats_pedido WHERE pedido_id = ? AND fornecedor_id = ?', [pedido_id, fornecedor_id]);
+    if (!chatRows[0]) return res.status(404).json({ error: 'Chat não encontrado' });
+    const [mensagens] = await pool.query(
+      'SELECT m.*, u.nome as remetente_nome FROM mensagens_chat_pedido m JOIN usuarios u ON m.remetente_id = u.id WHERE m.chat_id = ? ORDER BY m.enviada_em ASC',
+      [chatRows[0].id]
     );
-    res.json({ chat: chat.rows[0], mensagens: mensagens.rows });
+    res.json({ chat: chatRows[0], mensagens });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar chat/mensagens' });
   }
@@ -512,11 +522,12 @@ app.post('/chat-pedido/:chat_id/mensagem', async (req, res) => {
     return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
   }
   try {
-    const result = await pool.query(
-      'INSERT INTO mensagens_chat_pedido (chat_id, remetente_id, mensagem) VALUES ($1, $2, $3) RETURNING *',
+    const [result] = await pool.query(
+      'INSERT INTO mensagens_chat_pedido (chat_id, remetente_id, mensagem) VALUES (?, ?, ?)',
       [chat_id, remetente_id, mensagem]
     );
-    res.status(201).json(result.rows[0]);
+    const [novoRows] = await pool.query('SELECT * FROM mensagens_chat_pedido WHERE id = ?', [result.insertId]);
+    res.status(201).json(novoRows[0]);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao enviar mensagem' });
   }
@@ -526,11 +537,11 @@ app.post('/chat-pedido/:chat_id/mensagem', async (req, res) => {
 app.get('/chat-pedido/:chat_id/mensagens', async (req, res) => {
   const { chat_id } = req.params;
   try {
-    const result = await pool.query(
-      'SELECT m.*, u.nome as remetente_nome FROM mensagens_chat_pedido m JOIN usuarios u ON m.remetente_id = u.id WHERE m.chat_id = $1 ORDER BY m.enviada_em ASC',
+    const [rows] = await pool.query(
+      'SELECT m.*, u.nome as remetente_nome FROM mensagens_chat_pedido m JOIN usuarios u ON m.remetente_id = u.id WHERE m.chat_id = ? ORDER BY m.enviada_em ASC',
       [chat_id]
     );
-    res.json(result.rows);
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar mensagens do chat' });
   }
@@ -540,11 +551,11 @@ app.get('/chat-pedido/:chat_id/mensagens', async (req, res) => {
 app.get('/chat-pedido/:chat_id/notificacoes/:destinatario_id', async (req, res) => {
   const { chat_id, destinatario_id } = req.params;
   try {
-    const result = await pool.query(
-      'SELECT * FROM notificacoes_chat_pedido WHERE chat_id = $1 AND destinatario_id = $2',
+    const [rows] = await pool.query(
+      'SELECT * FROM notificacoes_chat_pedido WHERE chat_id = ? AND destinatario_id = ?',
       [chat_id, destinatario_id]
     );
-    res.json(result.rows[0] || { quantidade: 0 });
+    res.json(rows[0] || { quantidade: 0 });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar notificações' });
   }
@@ -554,8 +565,8 @@ app.get('/chat-pedido/:chat_id/notificacoes/:destinatario_id', async (req, res) 
 app.put('/chat-pedido/:chat_id/notificacoes/:destinatario_id', async (req, res) => {
   const { chat_id, destinatario_id } = req.params;
   try {
-    await pool.query('UPDATE mensagens_chat_pedido SET lida = TRUE WHERE chat_id = $1 AND remetente_id != $2', [chat_id, destinatario_id]);
-    await pool.query('UPDATE notificacoes_chat_pedido SET quantidade = 0 WHERE chat_id = $1 AND destinatario_id = $2', [chat_id, destinatario_id]);
+    await pool.query('UPDATE mensagens_chat_pedido SET lida = TRUE WHERE chat_id = ? AND remetente_id != ?', [chat_id, destinatario_id]);
+    await pool.query('UPDATE notificacoes_chat_pedido SET quantidade = 0 WHERE chat_id = ? AND destinatario_id = ?', [chat_id, destinatario_id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao atualizar notificações' });
@@ -589,15 +600,27 @@ app.put('/usuarios/:id', async (req, res) => {
       }
     }
 
-    // Monta o objeto de atualização
-    const updates = {};
-    if (nome) updates.nome = nome;
-    if (email) updates.email = email;
-    if (nova_senha) updates.senha = nova_senha;
-
-    // Atualiza os dados
-    const updateQuery = 'UPDATE usuarios SET ? WHERE id = ?';
-    await pool.query(updateQuery, [updates, id]);
+    // Monta a query de atualização dinamicamente
+    let updateFields = [];
+    let updateValues = [];
+    if (nome) {
+      updateFields.push('nome = ?');
+      updateValues.push(nome);
+    }
+    if (email) {
+      updateFields.push('email = ?');
+      updateValues.push(email);
+    }
+    if (nova_senha) {
+      const hash = await bcrypt.hash(nova_senha, 10);
+      updateFields.push('senha = ?');
+      updateValues.push(hash);
+    }
+    if (updateFields.length > 0) {
+      const updateQuery = `UPDATE usuarios SET ${updateFields.join(', ')} WHERE id = ?`;
+      updateValues.push(id);
+      await pool.query(updateQuery, updateValues);
+    }
 
     // Retorna os dados atualizados
     const [updatedUser] = await pool.query(
@@ -612,6 +635,7 @@ app.put('/usuarios/:id', async (req, res) => {
   }
 });
 
-app.listen(3001, () => {
-  console.log('Servidor rodando em http://localhost:3001');
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });

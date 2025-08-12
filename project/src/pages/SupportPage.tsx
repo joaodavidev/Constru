@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 export default function SupportPage() {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -10,7 +11,9 @@ export default function SupportPage() {
   const [enviando, setEnviando] = useState(false);
   const [abrindoTicket, setAbrindoTicket] = useState(false);
   const [erro, setErro] = useState<string|null>(null);
-  const usuario_id = localStorage.getItem('userId') || 1; // TODO: pegar do contexto de auth
+  // ...existing code...
+  const { user } = useAuth();
+  const usuario_id = user?.id;
 
   // Buscar tickets do usuário
   useEffect(() => {

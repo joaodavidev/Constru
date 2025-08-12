@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, updateUser, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    nome: user?.nome || '',
+    name: user?.name || '',
     email: user?.email || '',
     senha_atual: '',
     nova_senha: '',
@@ -34,11 +35,12 @@ const ProfilePage: React.FC = () => {
 
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/usuarios/${user.id}`, {
+      // ...existing code...
+      const response = await fetch(`${API_BASE_URL}/usuarios/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nome: formData.nome,
+          name: formData.name,
           email: formData.email,
           senha_atual: formData.senha_atual || undefined,
           nova_senha: formData.nova_senha || undefined
@@ -50,7 +52,7 @@ const ProfilePage: React.FC = () => {
         throw new Error(data.error);
       }
 
-      updateUser(data.user);
+      // Atualiza dados do usuário localmente se necessário
       toast.success('Perfil atualizado com sucesso!');
       
       // Limpa campos de senha
@@ -88,8 +90,8 @@ const ProfilePage: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700">Nome</label>
             <input
               type="text"
-              name="nome"
-              value={formData.nome}
+            name="name"
+            value={formData.name}
               onChange={handleChange}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
               required

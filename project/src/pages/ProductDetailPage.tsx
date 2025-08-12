@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../api';
 import { Link, useParams } from 'react-router-dom';
-import { Star, ChevronLeft, ShoppingCart } from 'lucide-react';
+import { Star, ShoppingCart } from 'lucide-react';
 import { getProductById, getProductsByCategory } from '../data/products';
 import { useCart } from '../context/CartContext';
-import { Oferta } from '../types/supplier';
+// ...existing code...
 import { toast } from 'react-toastify';
 
 export default function ProductDetailPage() {
@@ -23,7 +24,8 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!id) return;
     setLoadingOfertas(true);
-    fetch(`http://localhost:3001/ofertas?produto_id=${id}`)
+    // ...existing code...
+    fetch(`${API_BASE_URL}/ofertas?produto_id=${id}`)
       .then(res => res.json())
       .then(data => setOfertas(Array.isArray(data) ? data : []))
       .catch(() => setOfertas([]))
@@ -33,7 +35,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!id) return;
     setLoadingAvaliacoes(true);
-    fetch(`http://localhost:3001/avaliacoes?produto_id=${id}`)
+    fetch(`${API_BASE_URL}/avaliacoes?produto_id=${id}`)
       .then(res => res.json())
       .then(data => setAvaliacoes(Array.isArray(data) ? data : []))
       .catch(() => setAvaliacoes([]))

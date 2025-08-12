@@ -1,5 +1,7 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Oferta } from '../types/supplier';
+import { API_BASE_URL } from '../api';
 
 interface CartItem {
   oferta: Oferta;
@@ -32,7 +34,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const token = localStorage.getItem('cartToken');
     const usuario_id = localStorage.getItem('userId');
-    fetch('http://localhost:3001/carrinho', {
+    fetch(`${API_BASE_URL}/carrinho`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(usuario_id ? { usuario_id } : { token }),
@@ -49,7 +51,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const syncCart = async (idOverride?: number) => {
     const id = idOverride || cartId;
     if (!id) return;
-    const res = await fetch(`http://localhost:3001/carrinho/${id}/itens`);
+    const res = await fetch(`${API_BASE_URL}/carrinho/${id}/itens`);
     const items = await res.json();
     setCart(items);
     setCartTotal(items.reduce((sum: number, item: CartItem) => sum + item.preco_unitario * item.quantidade, 0));
@@ -59,7 +61,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Adiciona item ao carrinho
   const addToCart = async (oferta: Oferta, quantidade = 1) => {
     if (!cartId) return;
-    await fetch(`http://localhost:3001/carrinho/${cartId}/item`, {
+    await fetch(`${API_BASE_URL}/carrinho/${cartId}/item`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ oferta_id: oferta.id, quantidade, preco_unitario: oferta.preco }),
@@ -69,13 +71,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   // Remove item do carrinho
   const removeFromCart = async (itemId: number) => {
-    await fetch(`http://localhost:3001/carrinho/item/${itemId}`, { method: 'DELETE' });
+    await fetch(`${API_BASE_URL}/carrinho/item/${itemId}`, { method: 'DELETE' });
     await syncCart();
   };
 
   // Atualiza quantidade
   const updateQuantity = async (itemId: number, quantidade: number) => {
-    await fetch(`http://localhost:3001/carrinho/item/${itemId}`, {
+    await fetch(`${API_BASE_URL}/carrinho/item/${itemId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ quantidade }),
