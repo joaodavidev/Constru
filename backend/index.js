@@ -18,6 +18,13 @@ app.get('/', (req, res) => {
   res.send('API está funcionando');
 });
 
+//Variavel de ambiente Stripe 
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
+
+//rota de saude
+app.get('/health', (_req, res) => res.send('ok'))
+
+
 // Exemplo de rota: listar usuários
 app.get('/usuarios', async (req, res) => {
   const result = await pool.query('SELECT * FROM usuarios');
@@ -635,7 +642,5 @@ app.put('/usuarios/:id', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+const PORT = process.env.PORT || 3000
+app.listen(PORT, '0.0.0.0', () => console.log(`Backend rodando na porta ${PORT}`));
