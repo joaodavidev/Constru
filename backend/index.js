@@ -18,6 +18,22 @@ app.get('/', (req, res) => {
   res.send('API está funcionando');
 });
 
+// Configuração do banco de dados MySQL e TLS
+// Certifique-se de que as variáveis de ambiente estão definidas corretamente
+const mysql = require('mysql2/promise');
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT || 3306),
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 5,
+  ssl: { rejectUnauthorized: true }
+});
+module.exports = pool;
+
+
 //Variavel de ambiente Stripe 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 
@@ -642,5 +658,17 @@ app.put('/usuarios/:id', async (req, res) => {
   }
 });
 
+// Rota de saúde do servidor e banco de dados
+app.get('/health', (_req,res)=>res.send('ok'));
+app.get('/db-health', async (_req,res)=>{
+  try {
+    const [r] = await pool.query('SELECT 1 AS ok');
+    res.json({ ok: r?.[0]?.ok === 1 });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Inicia o servidor na porta definida ou 3000 por padrão
 const PORT = process.env.PORT || 3000
 app.listen(PORT, '0.0.0.0', () => console.log(`Backend rodando na porta ${PORT}`));
