@@ -292,7 +292,7 @@ export default function ProductDetailPage() {
                       try {
                         // TODO: pegar usuario_id real do contexto de auth
                         const usuario_id = localStorage.getItem('userId') || 1;
-                        const res = await fetch('http://localhost:3001/avaliacoes', {
+                        const res = await fetch(`${API_BASE_URL}/avaliacoes`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
