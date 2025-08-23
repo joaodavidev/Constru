@@ -4,6 +4,9 @@ const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
 dotenv.config();
 const app = express();
+// Configuração do banco de dados MySQL e TLS
+// Certifique-se de que as variáveis de ambiente estão definidas corretamente
+const mysql = require('mysql2/promise');
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT || 3306),
@@ -27,11 +30,6 @@ app.use(express.json());
 app.get('/', (req, res) => {
   res.send('API está funcionando');
 });
-
-// Configuração do banco de dados MySQL e TLS
-// Certifique-se de que as variáveis de ambiente estão definidas corretamente
-const mysql = require('mysql2/promise');
-
 
 //Variavel de ambiente Stripe 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
