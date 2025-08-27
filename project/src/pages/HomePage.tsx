@@ -42,17 +42,19 @@ export default function HomePage() {
                 </svg>
               </div>
               <h3 className="font-semibold mb-2">Produtos de qualidade</h3>
-              <p className="text-gray-600 text-sm">Produtos cuidadosamente selecionados que atendem aos nossos altos padrões.</p>
+              <p className="text-gray-600 text-sm">Produtos escolhidos para atender os altos padrões do mercado e avaliado por usuários.</p>
             </div>
             
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+              {/* Ícone de moeda */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={2} fill="none" />
+                <text x="12" y="16" textAnchor="middle" fontSize="10" fill="currentColor" fontFamily="Arial" fontWeight="bold">$</text>
+              </svg>
               </div>
-              <h3 className="font-semibold mb-2">Entrega Rápida</h3>
-              <p className="text-gray-600 text-sm">Envio rápido com informações de rastreamento em tempo real.</p>
+              <h3 className="font-semibold mb-2">Preços competitivos</h3>
+              <p className="text-gray-600 text-sm">Trabalhamos com os fornecedores para buscar sempre os preços para você.</p>
             </div>
             
             <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -67,12 +69,13 @@ export default function HomePage() {
             
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth={2} fill="none" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+              </svg>
               </div>
-              <h3 className="font-semibold mb-2">Devolução Fácil</h3>
-              <p className="text-gray-600 text-sm">Política de devolução sem complicações em até 30 dias para todos os produtos.</p>
+              <h3 className="font-semibold mb-2">Facilidade de busca</h3>
+              <p className="text-gray-600 text-sm">Oferecemos conforto e praticidade para as buscas de preço do seu dia a dia.</p>
             </div>
           </div>
         </div>
