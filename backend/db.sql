@@ -1,3 +1,4 @@
+
 CREATE TABLE usuarios (
   id SERIAL PRIMARY KEY,
   nome VARCHAR(100) NOT NULL,
@@ -40,7 +41,7 @@ CREATE TABLE ofertas (
   id SERIAL PRIMARY KEY,
   produto_id INT NOT NULL REFERENCES produtos(id) ON DELETE CASCADE,
   fornecedor_id INT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
-  preco DECIMAL(10, 2) NOT NULL CHECK (preco > 0),
+  preco NUMERIC(10, 2) NOT NULL CHECK (preco > 0),
   estoque INT NOT NULL CHECK (estoque >= 0),
   endereco_id INT NOT NULL REFERENCES enderecos(id),
   UNIQUE (produto_id, fornecedor_id)
@@ -51,7 +52,7 @@ CREATE TABLE pedidos (
   cliente_id INT REFERENCES usuarios(id),
   data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   status_pagamento VARCHAR(20) CHECK (status_pagamento IN ('pendente', 'pago', 'cancelado')),
-  valor_total DECIMAL(10, 2)
+  valor_total NUMERIC(10, 2)
 );
 
 CREATE TABLE itens_pedido (
@@ -59,7 +60,7 @@ CREATE TABLE itens_pedido (
   pedido_id INT REFERENCES pedidos(id) ON DELETE CASCADE,
   oferta_id INT REFERENCES ofertas(id),
   quantidade INT NOT NULL,
-  preco_unitario DECIMAL(10, 2) NOT NULL
+  preco_unitario NUMERIC(10, 2) NOT NULL
 );
 
 CREATE TABLE avaliacoes (
@@ -101,24 +102,24 @@ CREATE TABLE suporte_mensagens (
 );
 
 -- Carrinho de compras persistente
-CREATE TABLE IF NOT EXISTS carrinhos (
+CREATE TABLE carrinhos (
   id SERIAL PRIMARY KEY,
-  usuario_id INT REFERENCES usuarios(id), -- pode ser NULL para anônimo
-  token VARCHAR(100), -- identificador para carrinho anônimo
+  usuario_id INT REFERENCES usuarios(id),
+  token VARCHAR(100),
   criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS itens_carrinho (
+CREATE TABLE itens_carrinho (
   id SERIAL PRIMARY KEY,
   carrinho_id INT REFERENCES carrinhos(id) ON DELETE CASCADE,
   oferta_id INT REFERENCES ofertas(id),
   quantidade INT NOT NULL CHECK (quantidade > 0),
-  preco_unitario DECIMAL(10,2) NOT NULL
+  preco_unitario NUMERIC(10,2) NOT NULL
 );
 
 -- Chat pós-compra entre cliente e fornecedor por pedido
-CREATE TABLE IF NOT EXISTS chats_pedido (
+CREATE TABLE chats_pedido (
   id SERIAL PRIMARY KEY,
   pedido_id INT REFERENCES pedidos(id) ON DELETE CASCADE,
   cliente_id INT REFERENCES usuarios(id),
@@ -126,7 +127,7 @@ CREATE TABLE IF NOT EXISTS chats_pedido (
   criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS mensagens_chat_pedido (
+CREATE TABLE mensagens_chat_pedido (
   id SERIAL PRIMARY KEY,
   chat_id INT REFERENCES chats_pedido(id) ON DELETE CASCADE,
   remetente_id INT REFERENCES usuarios(id),
@@ -136,7 +137,7 @@ CREATE TABLE IF NOT EXISTS mensagens_chat_pedido (
 );
 
 -- Notificações de mensagens não lidas por chat
-CREATE TABLE IF NOT EXISTS notificacoes_chat_pedido (
+CREATE TABLE notificacoes_chat_pedido (
   id SERIAL PRIMARY KEY,
   chat_id INT REFERENCES chats_pedido(id) ON DELETE CASCADE,
   destinatario_id INT REFERENCES usuarios(id),

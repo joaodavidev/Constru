@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Search, Filter, X } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
-import { products } from '../data/products';
+import { useEffect } from 'react';
+import { API_BASE_URL } from '../api';
 import { categories } from '../data/categories';
 
 export default function ProductsPage() {
@@ -10,23 +11,39 @@ export default function ProductsPage() {
   const [sortBy, setSortBy] = useState('featured');
   const [showFilters, setShowFilters] = useState(false);
   
-  // Filter and sort products
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         product.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === '' || product.category === selectedCategory;
-    
+  const [products, setProducts] = useState([]);
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/produtos`)
+      .then(res => res.json())
+      .then(data => {
+        // Mapear campos do backend para o tipo Product do frontend
+        const mapped = data.map((p: any) => ({
+          id: p.id?.toString() || p.id_produto?.toString() || '',
+          name: p.nome,
+          price: p.preco,
+          description: p.descricao,
+          image: p.imagem,
+          category: p.categoria_id?.toString() || '',
+          rating: p.rating || 0,
+          reviews: p.reviews || 0,
+          inStock: p.estoque > 0,
+          featured: false,
+        }));
+        setProducts(mapped);
+      })
+      .catch(() => setProducts([]));
+  }, []);
+
+  const filteredProducts = products.filter((product: any) => {
+    const matchesSearch = product.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         product.descricao.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === '' || product.categoria_id === selectedCategory;
     return matchesSearch && matchesCategory;
   });
-  
-  // Sort products
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    switch(sortBy) {
-      case 'rating':
-        return b.rating - a.rating;
-      default: // featured or any other
-        return b.featured ? 1 : -1;
-    }
+
+  const sortedProducts = [...filteredProducts].sort((a: any, b: any) => {
+    // Adapte o sort conforme os campos reais do backend
+    return 0;
   });
   
   const resetFilters = () => {

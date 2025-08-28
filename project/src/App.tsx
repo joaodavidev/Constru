@@ -12,6 +12,8 @@ import ProfilePage from './pages/ProfilePage';
 import SupplierSignupPage from './pages/SupplierSignupPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SupplierAnnouncementPage from './pages/SupplierAnnouncementPage';
+import SupplierDashboardPage from './pages/SupplierDashboardPage';
+import CreateProductPage from './pages/CreateProductPage';
 import SupportPage from './pages/SupportPage';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
@@ -43,6 +45,8 @@ function App() {
                     <SupplierAnnouncementPage />
                   </ProtectedSupplierRoute>
                 } />
+                <Route path="/fornecedor" element={<SupplierDashboardPage />} />
+                <Route path="/criar-produto" element={<CreateProductPage />} />
               </Routes>
             </main>
             <Footer />

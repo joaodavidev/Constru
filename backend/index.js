@@ -1,3 +1,49 @@
+// Endpoint para listar todos os produtos
+app.get('/produtos', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM produtos');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar produtos.' });
+  }
+});
+// Middleware para upload de imagem
+const multer = require('multer');
+const path = require('path');
+const upload = multer({
+  dest: path.join(__dirname, '../project/public/uploads'),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// Endpoint para cadastro de produto pelo fornecedor
+app.post('/produtos', upload.single('imagem'), async (req, res) => {
+  try {
+    const { nome, descricao, categoria_id, preco, estoque, endereco_id } = req.body;
+    const fornecedor_id = req.user?.id || req.body.fornecedor_id; // ajuste conforme autenticação
+    if (!nome || !descricao || !categoria_id || !preco || !estoque || !endereco_id || !fornecedor_id) {
+      return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
+    }
+    let imagemPath = null;
+    if (req.file) {
+      imagemPath = `/uploads/${req.file.filename}`;
+    }
+    // 1. Criar produto
+    const produtoResult = await pool.query(
+      'INSERT INTO produtos (nome, descricao, categoria_id, imagem) VALUES ($1, $2, $3, $4) RETURNING id',
+      [nome, descricao, categoria_id, imagemPath]
+    );
+    const produto_id = produtoResult.rows[0].id;
+    // 2. Criar oferta para o produto
+    const ofertaResult = await pool.query(
+      'INSERT INTO ofertas (produto_id, fornecedor_id, preco, estoque, endereco_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [produto_id, fornecedor_id, preco, estoque, endereco_id]
+    );
+    res.status(201).json({ produto_id, oferta_id: ofertaResult.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao criar produto.' });
+  }
+});
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
@@ -6,18 +52,15 @@ dotenv.config();
 const app = express();
 // Configuração do banco de dados MySQL e TLS
 // Certifique-se de que as variáveis de ambiente estão definidas corretamente
-const mysql = require('mysql2/promise');
-const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 5,
-  ssl: { rejectUnauthorized: true }
+const { Pool } = require('pg');
+const pool = new Pool({
+  host: process.env.PGHOST,
+  port: Number(process.env.PGPORT || 5432),
+  user: process.env.PGUSER,
+  password: process.env.PGPASSWORD,
+  database: process.env.PGDATABASE,
+  ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : false
 });
-module.exports = pool;
 
 // Habilita CORS para o frontend
 app.use(cors({
@@ -40,8 +83,12 @@ app.get('/health', (_req, res) => res.send('ok'))
 
 // Exemplo de rota: listar usuários
 app.get('/usuarios', async (req, res) => {
-  const result = await pool.query('SELECT * FROM usuarios');
-  res.json(result.rows);
+  try {
+    const result = await pool.query('SELECT * FROM usuarios');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar usuários' });
+  }
 });
 
 // Rota de login
@@ -51,8 +98,8 @@ app.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Email e senha são obrigatórios' });
   }
   try {
-    const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email]);
-    const user = rows[0];
+    const result = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
+    const user = result.rows[0];
     if (!user) {
       return res.status(401).json({ error: 'Usuário não encontrado' });
     }
@@ -78,20 +125,18 @@ app.post('/usuarios', async (req, res) => {
   }
   try {
     // Verifica se o email já existe
-    const [exists] = await pool.query('SELECT id FROM usuarios WHERE email = ?', [email]);
-    if (exists.length > 0) {
+    const exists = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
+    if (exists.rows.length > 0) {
       return res.status(409).json({ error: 'E-mail já cadastrado' });
     }
     // Hash da senha
     const hash = await bcrypt.hash(senha, 10);
     // Insere usuário
-    const [result] = await pool.query(
-      'INSERT INTO usuarios (nome, email, senha, tipo_usuario, cnpj) VALUES (?, ?, ?, ?, ?)',
+    const result = await pool.query(
+      'INSERT INTO usuarios (nome, email, senha, tipo_usuario, cnpj) VALUES ($1, $2, $3, $4, $5) RETURNING id, nome, email, tipo_usuario, cnpj',
       [nome, email, hash, tipo_usuario, cnpj || null]
     );
-    // Busca o usuário recém-criado
-    const [userRows] = await pool.query('SELECT id, nome, email, tipo_usuario, cnpj FROM usuarios WHERE id = ?', [result.insertId]);
-    res.status(201).json({ user: userRows[0] });
+    res.status(201).json({ user: result.rows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao cadastrar usuário' });
@@ -162,17 +207,30 @@ app.delete('/enderecos/:id', async (req, res) => {
 
 // Rotas para ofertas (anúncios do fornecedor)
 app.get('/ofertas', async (req, res) => {
-  const { fornecedor_id } = req.query;
-  if (!fornecedor_id) return res.status(400).json({ error: 'fornecedor_id é obrigatório' });
+  const { produto_id, fornecedor_id } = req.query;
   try {
-    const [rows] = await pool.query(
-      `SELECT o.*, p.nome as produto_nome, p.imagem as produto_imagem, e.nome_endereco FROM ofertas o
-       JOIN produtos p ON o.produto_id = p.id
-       JOIN enderecos e ON o.endereco_id = e.id
-       WHERE o.fornecedor_id = ?`,
-      [fornecedor_id]
-    );
-    res.json(rows);
+    let result;
+    if (produto_id) {
+      const query = `SELECT o.*, u.nome as fornecedor_nome, u.id as fornecedor_id, p.nome as produto_nome, p.imagem as produto_imagem, e.nome_endereco
+        FROM ofertas o
+        JOIN produtos p ON o.produto_id = p.id
+        JOIN usuarios u ON o.fornecedor_id = u.id
+        JOIN enderecos e ON o.endereco_id = e.id
+        WHERE o.produto_id = $1`;
+      const ofertas = await pool.query(query, [produto_id]);
+      result = ofertas.rows;
+    } else if (fornecedor_id) {
+      const query = `SELECT o.*, p.nome as produto_nome, p.imagem as produto_imagem, e.nome_endereco
+        FROM ofertas o
+        JOIN produtos p ON o.produto_id = p.id
+        JOIN enderecos e ON o.endereco_id = e.id
+        WHERE o.fornecedor_id = $1`;
+      const ofertas = await pool.query(query, [fornecedor_id]);
+      result = ofertas.rows;
+    } else {
+      return res.status(400).json({ error: 'produto_id ou fornecedor_id é obrigatório' });
+    }
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar ofertas' });
   }
