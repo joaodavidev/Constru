@@ -136,10 +136,17 @@ CREATE TABLE mensagens_chat_pedido (
   enviada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Notificações de mensagens não lidas por chat
 CREATE TABLE notificacoes_chat_pedido (
   id SERIAL PRIMARY KEY,
   chat_id INT REFERENCES chats_pedido(id) ON DELETE CASCADE,
   destinatario_id INT REFERENCES usuarios(id),
   quantidade INT DEFAULT 0
 );
+
+-- Índices recomendados para performance em consultas e joins
+CREATE INDEX idx_ofertas_produto_id ON ofertas(produto_id);
+CREATE INDEX idx_ofertas_fornecedor_id ON ofertas(fornecedor_id);
+CREATE INDEX idx_produtos_categoria_id ON produtos(categoria_id);
+CREATE INDEX idx_enderecos_usuario_id ON enderecos(usuario_id);
+CREATE INDEX idx_avaliacoes_produto_id ON avaliacoes(produto_id);
+CREATE INDEX idx_avaliacoes_usuario_id ON avaliacoes(usuario_id);
