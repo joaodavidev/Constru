@@ -1,49 +1,4 @@
-// Endpoint para listar todos os produtos
-app.get('/produtos', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM produtos');
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: 'Erro ao buscar produtos.' });
-  }
-});
-// Middleware para upload de imagem
-const multer = require('multer');
-const path = require('path');
-const upload = multer({
-  dest: path.join(__dirname, '../project/public/uploads'),
-  limits: { fileSize: 5 * 1024 * 1024 },
-});
 
-// Endpoint para cadastro de produto pelo fornecedor
-app.post('/produtos', upload.single('imagem'), async (req, res) => {
-  try {
-    const { nome, descricao, categoria_id, preco, estoque, endereco_id } = req.body;
-    const fornecedor_id = req.user?.id || req.body.fornecedor_id; // ajuste conforme autenticação
-    if (!nome || !descricao || !categoria_id || !preco || !estoque || !endereco_id || !fornecedor_id) {
-      return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
-    }
-    let imagemPath = null;
-    if (req.file) {
-      imagemPath = `/uploads/${req.file.filename}`;
-    }
-    // 1. Criar produto
-    const produtoResult = await pool.query(
-      'INSERT INTO produtos (nome, descricao, categoria_id, imagem) VALUES ($1, $2, $3, $4) RETURNING id',
-      [nome, descricao, categoria_id, imagemPath]
-    );
-    const produto_id = produtoResult.rows[0].id;
-    // 2. Criar oferta para o produto
-    const ofertaResult = await pool.query(
-      'INSERT INTO ofertas (produto_id, fornecedor_id, preco, estoque, endereco_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-      [produto_id, fornecedor_id, preco, estoque, endereco_id]
-    );
-    res.status(201).json({ produto_id, oferta_id: ofertaResult.rows[0].id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao criar produto.' });
-  }
-});
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
