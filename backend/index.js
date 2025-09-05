@@ -6,8 +6,8 @@ const dotenv = require('dotenv');
 dotenv.config();
 const app = express();
 // Configuração do banco de dados MySQL e TLS
-// Certifique-se de que as variáveis de ambiente estão definidas corretamente
-const { Pool } = require('pg');
+// antes: const { Pool } = require('pg'); const pool = new Pool({ ... });
+const pool = require('./db'); // usa DATABASE_URL com SSL (Neon)
 const pool = new Pool({
   host: process.env.PGHOST,
   port: Number(process.env.PGPORT || 5432),
@@ -46,204 +46,177 @@ app.get('/usuarios', async (req, res) => {
   }
 });
 
-// Rota de login
-app.post('/login', async (req, res) => {
-  const { email, senha } = req.body;
-  if (!email || !senha) {
-    return res.status(400).json({ error: 'Email e senha são obrigatórios' });
-  }
-  try {
-    const result = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
-    const user = result.rows[0];
-    if (!user) {
-      return res.status(401).json({ error: 'Usuário não encontrado' });
-    }
-    // Comparação segura de senha
-    const senhaCorreta = await bcrypt.compare(senha, user.senha);
-    if (!senhaCorreta) {
-      return res.status(401).json({ error: 'Senha incorreta' });
-    }
-    // Remover senha do retorno
-    const { senha: _, ...userData } = user;
-    res.json({ user: userData });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Rota para cadastro de usuário (cliente ou fornecedor)
+// POST /usuarios  (cadastro cliente/fornecedor)
 app.post('/usuarios', async (req, res) => {
   const { nome, email, senha, tipo_usuario, cnpj } = req.body;
   if (!nome || !email || !senha || !tipo_usuario) {
     return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
   }
   try {
-    // Verifica se o email já existe
-    const exists = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
-    if (exists.rows.length > 0) {
-      return res.status(409).json({ error: 'E-mail já cadastrado' });
-    }
-    // Hash da senha
+    const exists = await pool.query('SELECT 1 FROM usuarios WHERE email = $1', [email]);
+    if (exists.rows.length) return res.status(409).json({ error: 'E-mail já cadastrado' });
+
+    const bcrypt = require('bcryptjs');
     const hash = await bcrypt.hash(senha, 10);
-    // Insere usuário
+
     const result = await pool.query(
-      'INSERT INTO usuarios (nome, email, senha, tipo_usuario, cnpj) VALUES ($1, $2, $3, $4, $5) RETURNING id, nome, email, tipo_usuario, cnpj',
+      `INSERT INTO usuarios (nome, email, senha, tipo_usuario, cnpj)
+       VALUES ($1,$2,$3,$4,$5)
+       RETURNING id, nome, email, tipo_usuario, cnpj`,
       [nome, email, hash, tipo_usuario, cnpj || null]
     );
     res.status(201).json({ user: result.rows[0] });
-  } catch (err) {
-    console.error(err);
+  } catch (e) {
     res.status(500).json({ error: 'Erro ao cadastrar usuário' });
   }
 });
 
+// POST /login
+app.post('/login', async (req, res) => {
+  const { email, senha } = req.body;
+  if (!email || !senha) return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+  try {
+    const r = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
+    const u = r.rows[0];
+    if (!u) return res.status(401).json({ error: 'Usuário não encontrado' });
+
+    const bcrypt = require('bcryptjs');
+    const ok = await bcrypt.compare(senha, u.senha);
+    if (!ok) return res.status(401).json({ error: 'Senha incorreta' });
+
+    const { senha: _, ...userData } = u;
+    res.json({ user: userData });
+  } catch (e) {
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 // Rotas para endereços do fornecedor
+// GET /enderecos?usuario_id=123
 app.get('/enderecos', async (req, res) => {
   const { usuario_id } = req.query;
   if (!usuario_id) return res.status(400).json({ error: 'usuario_id é obrigatório' });
   try {
-    const [rows] = await pool.query('SELECT * FROM enderecos WHERE usuario_id = ?', [usuario_id]);
-    res.json(rows);
-  } catch (err) {
+    const r = await pool.query('SELECT * FROM enderecos WHERE usuario_id = $1 ORDER BY id DESC', [usuario_id]);
+    res.json(r.rows);
+  } catch (e) {
     res.status(500).json({ error: 'Erro ao buscar endereços' });
   }
 });
 
+// POST /enderecos
 app.post('/enderecos', async (req, res) => {
   const { usuario_id, nome_endereco, rua, numero, complemento, bairro, cidade, estado, cep } = req.body;
-  if (!usuario_id || !nome_endereco) return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
+  if (!usuario_id || !nome_endereco || !rua || !numero || !bairro || !cidade || !estado || !cep) {
+    return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
+  }
   try {
-    const [exists] = await pool.query('SELECT 1 FROM enderecos WHERE usuario_id = ? AND nome_endereco = ?', [usuario_id, nome_endereco]);
-    if (exists.length > 0) return res.status(409).json({ error: 'Apelido de endereço já cadastrado' });
-    const [result] = await pool.query(
-      'INSERT INTO enderecos (usuario_id, nome_endereco, rua, numero, complemento, bairro, cidade, estado, cep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [usuario_id, nome_endereco, rua, numero, complemento, bairro, cidade, estado, cep]
+    const r = await pool.query(
+      `INSERT INTO enderecos (usuario_id, nome_endereco, rua, numero, complemento, bairro, cidade, estado, cep)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING *`,
+      [usuario_id, nome_endereco, rua, numero, complemento || null, bairro, cidade, estado, cep]
     );
-    // Busca o endereço recém-criado
-    const [rows] = await pool.query('SELECT * FROM enderecos WHERE id = ?', [result.insertId]);
-    res.status(201).json(rows[0]);
-  } catch (err) {
+    res.status(201).json(r.rows[0]);
+  } catch (e) {
     res.status(500).json({ error: 'Erro ao cadastrar endereço' });
   }
 });
 
-app.put('/enderecos/:id', async (req, res) => {
-  const { id } = req.params;
-  const { nome_endereco, rua, numero, complemento, bairro, cidade, estado, cep } = req.body;
-  if (!nome_endereco) return res.status(400).json({ error: 'nome_endereco é obrigatório' });
-  try {
-    await pool.query(
-      'UPDATE enderecos SET nome_endereco=?, rua=?, numero=?, complemento=?, bairro=?, cidade=?, estado=?, cep=? WHERE id=?',
-      [nome_endereco, rua, numero, complemento, bairro, cidade, estado, cep, id]
-    );
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Erro ao atualizar endereço' });
-  }
-});
-
+// DELETE /enderecos/:id  (bloqueia se houver ofertas naquele endereço)
 app.delete('/enderecos/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    // Verifica se existe oferta vinculada
-    const [vinculo] = await pool.query('SELECT 1 FROM ofertas WHERE endereco_id = ?', [id]);
-    if (vinculo.length > 0) {
-      // Busca produtos vinculados
-      const [produtos] = await pool.query('SELECT p.id, p.nome FROM ofertas o JOIN produtos p ON o.produto_id = p.id WHERE o.endereco_id = ?', [id]);
-      return res.status(409).json({ error: 'Este endereço está vinculado aos seguintes anúncios e não pode ser removido.', produtos });
+    const uso = await pool.query(
+      `SELECT o.id, p.nome
+         FROM ofertas o
+         JOIN produtos p ON p.id = o.produto_id
+        WHERE o.endereco_id = $1`,
+      [id]
+    );
+    if (uso.rows.length) {
+      return res.status(409).json({
+        error: 'Endereço em uso por ofertas',
+        produtos: uso.rows.map(r => ({ id: r.id, nome: r.nome }))
+      });
     }
-    await pool.query('DELETE FROM enderecos WHERE id = ?', [id]);
+    await pool.query('DELETE FROM enderecos WHERE id = $1', [id]);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Erro ao remover endereço' });
+  } catch (e) {
+    res.status(500).json({ error: 'Erro ao excluir endereço' });
   }
 });
 
 // Rotas para ofertas (anúncios do fornecedor)
+// GET /produtos  (lista base - usada pelo front)
+app.get('/produtos', async (_req, res) => {
+  try {
+    const r = await pool.query(
+      'SELECT id, nome, descricao, categoria_id, imagem FROM produtos ORDER BY id ASC LIMIT 500'
+    );
+    res.json(r.rows);
+  } catch (e) {
+    res.status(500).json({ error: 'Erro ao listar produtos' });
+  }
+});
+
+// GET /ofertas?produto_id=1  OR  /ofertas?fornecedor_id=2
 app.get('/ofertas', async (req, res) => {
   const { produto_id, fornecedor_id } = req.query;
   try {
-    let result;
     if (produto_id) {
-      const query = `SELECT o.*, u.nome as fornecedor_nome, u.id as fornecedor_id, p.nome as produto_nome, p.imagem as produto_imagem, e.nome_endereco
-        FROM ofertas o
-        JOIN produtos p ON o.produto_id = p.id
-        JOIN usuarios u ON o.fornecedor_id = u.id
-        JOIN enderecos e ON o.endereco_id = e.id
-        WHERE o.produto_id = $1`;
-      const ofertas = await pool.query(query, [produto_id]);
-      result = ofertas.rows;
-    } else if (fornecedor_id) {
-      const query = `SELECT o.*, p.nome as produto_nome, p.imagem as produto_imagem, e.nome_endereco
-        FROM ofertas o
-        JOIN produtos p ON o.produto_id = p.id
-        JOIN enderecos e ON o.endereco_id = e.id
-        WHERE o.fornecedor_id = $1`;
-      const ofertas = await pool.query(query, [fornecedor_id]);
-      result = ofertas.rows;
-    } else {
-      return res.status(400).json({ error: 'produto_id ou fornecedor_id é obrigatório' });
+      const r = await pool.query(
+        `SELECT o.*, u.nome AS fornecedor_nome, p.nome AS produto_nome, p.imagem AS produto_imagem, e.nome_endereco
+           FROM ofertas o
+           JOIN produtos p ON p.id = o.produto_id
+           JOIN usuarios u ON u.id = o.fornecedor_id
+           JOIN enderecos e ON e.id = o.endereco_id
+          WHERE o.produto_id = $1
+          ORDER BY o.id DESC`,
+        [produto_id]
+      );
+      return res.json(r.rows);
     }
-    res.json(result);
-  } catch (err) {
+    if (fornecedor_id) {
+      const r = await pool.query(
+        `SELECT o.*, p.nome AS produto_nome, p.imagem AS produto_imagem, e.nome_endereco
+           FROM ofertas o
+           JOIN produtos p ON p.id = o.produto_id
+           JOIN enderecos e ON e.id = o.endereco_id
+          WHERE o.fornecedor_id = $1
+          ORDER BY o.id DESC`,
+        [fornecedor_id]
+      );
+      return res.json(r.rows);
+    }
+    res.status(400).json({ error: 'produto_id ou fornecedor_id é obrigatório' });
+  } catch (e) {
     res.status(500).json({ error: 'Erro ao buscar ofertas' });
   }
 });
 
+// POST /ofertas
 app.post('/ofertas', async (req, res) => {
   const { produto_id, fornecedor_id, preco, estoque, endereco_id } = req.body;
-  if (!produto_id || !fornecedor_id || !preco || !endereco_id || estoque === undefined) {
+  if (!produto_id || !fornecedor_id || preco == null || estoque == null || !endereco_id) {
     return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
   }
-  if (preco <= 0 || estoque < 0) {
-    return res.status(400).json({ error: 'Preço deve ser maior que zero e estoque não pode ser negativo' });
+  if (Number(preco) <= 0 || Number(estoque) < 0) {
+    return res.status(400).json({ error: 'Preço > 0 e estoque >= 0' });
   }
   try {
-    // Garante que não existe oferta duplicada
-    const [exists] = await pool.query('SELECT 1 FROM ofertas WHERE produto_id = ? AND fornecedor_id = ?', [produto_id, fornecedor_id]);
-    if (exists.length > 0) return res.status(409).json({ error: 'Você já possui um anúncio para este produto' });
-    const [result] = await pool.query(
-      'INSERT INTO ofertas (produto_id, fornecedor_id, preco, estoque, endereco_id) VALUES (?, ?, ?, ?, ?)',
+    const r = await pool.query(
+      `INSERT INTO ofertas (produto_id, fornecedor_id, preco, estoque, endereco_id)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
       [produto_id, fornecedor_id, preco, estoque, endereco_id]
     );
-    // Busca o anúncio recém-criado
-    const [rows] = await pool.query('SELECT * FROM ofertas WHERE id = ?', [result.insertId]);
-    res.status(201).json(rows[0]);
-  } catch (err) {
+    res.status(201).json(r.rows[0]);
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'Oferta duplicada (produto + fornecedor)' });
     res.status(500).json({ error: 'Erro ao criar oferta' });
   }
 });
 
-app.put('/ofertas/:id', async (req, res) => {
-  const { id } = req.params;
-  const { preco, estoque, endereco_id } = req.body;
-  if (!preco || !endereco_id || estoque === undefined) {
-    return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
-  }
-  if (preco <= 0 || estoque < 0) {
-    return res.status(400).json({ error: 'Preço deve ser maior que zero e estoque não pode ser negativo' });
-  }
-  try {
-    await pool.query(
-      'UPDATE ofertas SET preco=?, estoque=?, endereco_id=? WHERE id=?',
-      [preco, estoque, endereco_id, id]
-    );
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Erro ao atualizar oferta' });
-  }
-});
-
-app.delete('/ofertas/:id', async (req, res) => {
-  const { id } = req.params;
-  try {
-    await pool.query('DELETE FROM ofertas WHERE id = ?', [id]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Erro ao remover oferta' });
-  }
-});
 
 // Rotas para avaliações (reviews)
 app.get('/avaliacoes', async (req, res) => {
@@ -393,121 +366,77 @@ app.put('/suporte/tickets/:id', async (req, res) => {
   }
 });
 
-// Rotas para Carrinho de Compras
-// Criar ou buscar carrinho (anônimo ou autenticado)
+
+// POST /carrinho  (cria/retorna carrinho por usuario_id OU token)
 app.post('/carrinho', async (req, res) => {
   const { usuario_id, token } = req.body;
   try {
-    let carrinho;
     if (usuario_id) {
-      const [rows] = await pool.query('SELECT * FROM carrinhos WHERE usuario_id = ?', [usuario_id]);
-      carrinho = rows[0];
-      if (!carrinho) {
-        const [result] = await pool.query('INSERT INTO carrinhos (usuario_id) VALUES (?)', [usuario_id]);
-        const [novoRows] = await pool.query('SELECT * FROM carrinhos WHERE id = ?', [result.insertId]);
-        carrinho = novoRows[0];
+      let r = await pool.query('SELECT * FROM carrinhos WHERE usuario_id = $1', [usuario_id]);
+      if (!r.rows.length) {
+        r = await pool.query('INSERT INTO carrinhos (usuario_id) VALUES ($1) RETURNING *', [usuario_id]);
       }
-    } else if (token) {
-      const [rows] = await pool.query('SELECT * FROM carrinhos WHERE token = ?', [token]);
-      carrinho = rows[0];
-      if (!carrinho) {
-        const [result] = await pool.query('INSERT INTO carrinhos (token) VALUES (?)', [token]);
-        const [novoRows] = await pool.query('SELECT * FROM carrinhos WHERE id = ?', [result.insertId]);
-        carrinho = novoRows[0];
-      }
-    } else {
-      return res.status(400).json({ error: 'usuario_id ou token é obrigatório' });
+      return res.json(r.rows[0]);
     }
-    res.json(carrinho);
-  } catch (err) {
+    if (token) {
+      let r = await pool.query('SELECT * FROM carrinhos WHERE token = $1', [token]);
+      if (!r.rows.length) {
+        r = await pool.query('INSERT INTO carrinhos (token) VALUES ($1) RETURNING *', [token]);
+      }
+      return res.json(r.rows[0]);
+    }
+    res.status(400).json({ error: 'usuario_id ou token é obrigatório' });
+  } catch (e) {
     res.status(500).json({ error: 'Erro ao buscar/criar carrinho' });
   }
 });
 
-// Buscar itens do carrinho
+// GET /carrinho/:id/itens
 app.get('/carrinho/:id/itens', async (req, res) => {
   const { id } = req.params;
   try {
-    const [rows] = await pool.query(
-      `SELECT ic.*, o.preco, o.estoque, p.nome as produto_nome, p.imagem
-       FROM itens_carrinho ic
-       JOIN ofertas o ON ic.oferta_id = o.id
-       JOIN produtos p ON o.produto_id = p.id
-       WHERE ic.carrinho_id = ?`,
+    const r = await pool.query(
+      `SELECT ic.*, o.preco, o.estoque, p.nome AS produto_nome, p.imagem
+         FROM itens_carrinho ic
+         JOIN ofertas o ON o.id = ic.oferta_id
+         JOIN produtos p ON p.id = o.produto_id
+        WHERE ic.carrinho_id = $1
+        ORDER BY ic.id DESC`,
       [id]
     );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: 'Erro ao buscar itens do carrinho' });
+    res.json(r.rows);
+  } catch (e) {
+    res.status(500).json({ error: 'Erro ao listar itens do carrinho' });
   }
 });
 
-// Adicionar item ao carrinho
+// POST /carrinho/:id/item
 app.post('/carrinho/:id/item', async (req, res) => {
-  const { id } = req.params;
+  const { id } = req.params; // carrinho_id
   const { oferta_id, quantidade, preco_unitario } = req.body;
   if (!oferta_id || !quantidade || !preco_unitario) {
     return res.status(400).json({ error: 'Campos obrigatórios não preenchidos' });
   }
   try {
-    // Verifica se já existe o item
-    const [exists] = await pool.query('SELECT * FROM itens_carrinho WHERE carrinho_id = ? AND oferta_id = ?', [id, oferta_id]);
-    if (exists.length > 0) {
-      // Atualiza quantidade
-      const novoQtd = exists[0].quantidade + quantidade;
-      await pool.query('UPDATE itens_carrinho SET quantidade = ? WHERE id = ?', [novoQtd, exists[0].id]);
+    const exists = await pool.query(
+      'SELECT id, quantidade FROM itens_carrinho WHERE carrinho_id = $1 AND oferta_id = $2',
+      [id, oferta_id]
+    );
+    if (exists.rows.length) {
+      const novo = Number(exists.rows[0].quantidade) + Number(quantidade);
+      await pool.query('UPDATE itens_carrinho SET quantidade = $1 WHERE id = $2', [novo, exists.rows[0].id]);
       return res.json({ success: true, updated: true });
     }
     await pool.query(
-      'INSERT INTO itens_carrinho (carrinho_id, oferta_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)',
+      'INSERT INTO itens_carrinho (carrinho_id, oferta_id, quantidade, preco_unitario) VALUES ($1,$2,$3,$4)',
       [id, oferta_id, quantidade, preco_unitario]
     );
     res.status(201).json({ success: true });
-  } catch (err) {
+  } catch (e) {
     res.status(500).json({ error: 'Erro ao adicionar item ao carrinho' });
   }
 });
 
-// Atualizar quantidade de um item do carrinho
-app.put('/carrinho/item/:item_id', async (req, res) => {
-  const { item_id } = req.params;
-  const { quantidade } = req.body;
-  if (!quantidade) return res.status(400).json({ error: 'quantidade é obrigatória' });
-  try {
-    await pool.query('UPDATE itens_carrinho SET quantidade = ? WHERE id = ?', [quantidade, item_id]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Erro ao atualizar item do carrinho' });
-  }
-});
-
-// Remover item do carrinho
-app.delete('/carrinho/item/:item_id', async (req, res) => {
-  const { item_id } = req.params;
-  try {
-    await pool.query('DELETE FROM itens_carrinho WHERE id = ?', [item_id]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Erro ao remover item do carrinho' });
-  }
-});
-
-// Migrar carrinho anônimo para usuário autenticado
-app.post('/carrinho/migrar', async (req, res) => {
-  const { token, usuario_id } = req.body;
-  if (!token || !usuario_id) return res.status(400).json({ error: 'token e usuario_id são obrigatórios' });
-  try {
-    // Busca carrinho anônimo
-    const [rows] = await pool.query('SELECT * FROM carrinhos WHERE token = ?', [token]);
-    const carrinho = rows[0];
-    if (!carrinho) return res.status(404).json({ error: 'Carrinho não encontrado' });
-    // Atualiza carrinho para vincular ao usuário
-    await pool.query('UPDATE carrinhos SET usuario_id = ?, token = NULL WHERE id = ?', [usuario_id, carrinho.id]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Erro ao migrar carrinho' });
-  }
-});
 
 // Rotas para Chat Pós-Compra (cliente <-> fornecedor por pedido)
 // Criar chat para um pedido (após pagamento)
